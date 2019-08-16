@@ -7,6 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		49398DCA2306644700233F9F /* PieceTreeBase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49398DC52306644600233F9F /* PieceTreeBase.swift */; };
+		49398DCB2306644700233F9F /* Position.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49398DC62306644600233F9F /* Position.swift */; };
+		49398DCC2306644700233F9F /* Range.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49398DC72306644700233F9F /* Range.swift */; };
+		49398DCD2306644700233F9F /* PieceTreeBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49398DC82306644700233F9F /* PieceTreeBuilder.swift */; };
+		49398DCE2306644700233F9F /* TreeBase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49398DC92306644700233F9F /* TreeBase.swift */; };
 		497FDDA52306635D00B9E815 /* TextBufferKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 497FDD9B2306635D00B9E815 /* TextBufferKit.framework */; };
 		497FDDAA2306635D00B9E815 /* TextBufferKitTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 497FDDA92306635D00B9E815 /* TextBufferKitTests.swift */; };
 		497FDDAC2306635D00B9E815 /* TextBufferKit.h in Headers */ = {isa = PBXBuildFile; fileRef = 497FDD9E2306635D00B9E815 /* TextBufferKit.h */; settings = {ATTRIBUTES = (Public, ); }; };
@@ -23,6 +28,11 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		49398DC52306644600233F9F /* PieceTreeBase.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PieceTreeBase.swift; sourceTree = "<group>"; };
+		49398DC62306644600233F9F /* Position.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Position.swift; sourceTree = "<group>"; };
+		49398DC72306644700233F9F /* Range.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Range.swift; sourceTree = "<group>"; };
+		49398DC82306644700233F9F /* PieceTreeBuilder.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PieceTreeBuilder.swift; sourceTree = "<group>"; };
+		49398DC92306644700233F9F /* TreeBase.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TreeBase.swift; sourceTree = "<group>"; };
 		497FDD9B2306635D00B9E815 /* TextBufferKit.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = TextBufferKit.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		497FDD9E2306635D00B9E815 /* TextBufferKit.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TextBufferKit.h; sourceTree = "<group>"; };
 		497FDD9F2306635D00B9E815 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -73,6 +83,11 @@
 			children = (
 				497FDD9E2306635D00B9E815 /* TextBufferKit.h */,
 				497FDD9F2306635D00B9E815 /* Info.plist */,
+				49398DC52306644600233F9F /* PieceTreeBase.swift */,
+				49398DC82306644700233F9F /* PieceTreeBuilder.swift */,
+				49398DC62306644600233F9F /* Position.swift */,
+				49398DC72306644700233F9F /* Range.swift */,
+				49398DC92306644700233F9F /* TreeBase.swift */,
 			);
 			path = TextBufferKit;
 			sourceTree = "<group>";
@@ -148,6 +163,7 @@
 				TargetAttributes = {
 					497FDD9A2306635D00B9E815 = {
 						CreatedOnToolsVersion = 11.0;
+						LastSwiftMigration = 1100;
 					};
 					497FDDA32306635D00B9E815 = {
 						CreatedOnToolsVersion = 11.0;
@@ -195,6 +211,11 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				49398DCC2306644700233F9F /* Range.swift in Sources */,
+				49398DCB2306644700233F9F /* Position.swift in Sources */,
+				49398DCE2306644700233F9F /* TreeBase.swift in Sources */,
+				49398DCD2306644700233F9F /* PieceTreeBuilder.swift in Sources */,
+				49398DCA2306644700233F9F /* PieceTreeBase.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -339,6 +360,7 @@
 		497FDDB02306635D00B9E815 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				DEFINES_MODULE = YES;
@@ -356,6 +378,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = org.tirania.TextBufferKit;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
 				SKIP_INSTALL = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
 			};
 			name = Debug;
@@ -363,6 +386,7 @@
 		497FDDB12306635D00B9E815 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				DEFINES_MODULE = YES;
@@ -387,6 +411,7 @@
 		497FDDB32306635D00B9E815 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				DEVELOPMENT_TEAM = PJQC57N853;
@@ -405,6 +430,7 @@
 		497FDDB42306635D00B9E815 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				DEVELOPMENT_TEAM = PJQC57N853;

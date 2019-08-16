@@ -19,9 +19,33 @@ class TextBufferKitTests: XCTestCase {
         // Put teardown code here. This method is called after the invocation of each test method in the class.
     }
 
+    func toBytes (_ str: String) -> [UInt8]
+    {
+        
+        if let d = str.data (using: .utf8){
+            return ([UInt8](d))
+        }
+        return []
+    }
+    
     func testExample() {
         // This is an example of a functional test case.
         // Use XCTAssert and related functions to verify your tests produce the correct results.
+        let builder = PieceTreeTextBufferBuilder()
+
+        builder.acceptChunk("abc\n")
+        builder.acceptChunk("def")
+        let factory = builder.finish(normalizeEol: true)
+        let pieceTree = factory.create(DefaultEndOfLine.LF)
+
+        XCTAssertEqual(pieceTree.lineCount, 2)
+        XCTAssertEqual(pieceTree.getLineContent (1), toBytes ("abc"))
+        XCTAssertEqual(pieceTree.getLineContent(2), toBytes ("def"))
+        pieceTree.insert(offset: 1, value: [65])
+        
+        XCTAssertEqual(pieceTree.lineCount, 2)
+        XCTAssertEqual(pieceTree.getLineContent (1), toBytes ("aAbc"))
+        XCTAssertEqual(pieceTree.getLineContent(2), toBytes ("def"))
     }
 
     func testPerformanceExample() {
