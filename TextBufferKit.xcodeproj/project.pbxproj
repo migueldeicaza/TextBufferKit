@@ -12,6 +12,7 @@
 		49398DCC2306644700233F9F /* Range.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49398DC72306644700233F9F /* Range.swift */; };
 		49398DCD2306644700233F9F /* PieceTreeBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49398DC82306644700233F9F /* PieceTreeBuilder.swift */; };
 		49398DCE2306644700233F9F /* TreeBase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49398DC92306644700233F9F /* TreeBase.swift */; };
+		49398DD02307B2C700233F9F /* PieceTreeTextBuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49398DCF2307B2C700233F9F /* PieceTreeTextBuffer.swift */; };
 		497FDDA52306635D00B9E815 /* TextBufferKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 497FDD9B2306635D00B9E815 /* TextBufferKit.framework */; };
 		497FDDAA2306635D00B9E815 /* TextBufferKitTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 497FDDA92306635D00B9E815 /* TextBufferKitTests.swift */; };
 		497FDDAC2306635D00B9E815 /* TextBufferKit.h in Headers */ = {isa = PBXBuildFile; fileRef = 497FDD9E2306635D00B9E815 /* TextBufferKit.h */; settings = {ATTRIBUTES = (Public, ); }; };
@@ -33,6 +34,7 @@
 		49398DC72306644700233F9F /* Range.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Range.swift; sourceTree = "<group>"; };
 		49398DC82306644700233F9F /* PieceTreeBuilder.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PieceTreeBuilder.swift; sourceTree = "<group>"; };
 		49398DC92306644700233F9F /* TreeBase.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TreeBase.swift; sourceTree = "<group>"; };
+		49398DCF2307B2C700233F9F /* PieceTreeTextBuffer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PieceTreeTextBuffer.swift; sourceTree = "<group>"; };
 		497FDD9B2306635D00B9E815 /* TextBufferKit.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = TextBufferKit.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		497FDD9E2306635D00B9E815 /* TextBufferKit.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TextBufferKit.h; sourceTree = "<group>"; };
 		497FDD9F2306635D00B9E815 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -88,6 +90,7 @@
 				49398DC62306644600233F9F /* Position.swift */,
 				49398DC72306644700233F9F /* Range.swift */,
 				49398DC92306644700233F9F /* TreeBase.swift */,
+				49398DCF2307B2C700233F9F /* PieceTreeTextBuffer.swift */,
 			);
 			path = TextBufferKit;
 			sourceTree = "<group>";
@@ -216,6 +219,7 @@
 				49398DCE2306644700233F9F /* TreeBase.swift in Sources */,
 				49398DCD2306644700233F9F /* PieceTreeBuilder.swift in Sources */,
 				49398DCA2306644700233F9F /* PieceTreeBase.swift in Sources */,
+				49398DD02307B2C700233F9F /* PieceTreeTextBuffer.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

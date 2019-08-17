@@ -215,7 +215,7 @@ func rbDelete(_ tree: PieceTreeBase, _ z: TreeNode) {
 
     if (y === z) {
         x.parent = y.parent
-        recomputeTreeMetadata(tree, &x)
+        recomputeTreeMetadata(tree, x)
     } else {
         if (y.parent === z) {
             x.parent = y
@@ -224,7 +224,7 @@ func rbDelete(_ tree: PieceTreeBase, _ z: TreeNode) {
         }
 
         // as we make changes to x's hierarchy, update size_left of subtree first
-        recomputeTreeMetadata(tree, &x)
+        recomputeTreeMetadata(tree, x)
 
         y.left = z.left
         y.right = z.right
@@ -251,7 +251,7 @@ func rbDelete(_ tree: PieceTreeBase, _ z: TreeNode) {
         // we replace z with y, so in this sub tree, the length change is z.item.length
         y.size_left = z.size_left
         y.lf_left = z.lf_left
-        recomputeTreeMetadata(tree, &y)
+        recomputeTreeMetadata(tree, y)
     }
 
     z.detach();
@@ -268,7 +268,7 @@ func rbDelete(_ tree: PieceTreeBase, _ z: TreeNode) {
         }
     }
 
-    recomputeTreeMetadata(tree, &x.parent!)
+    recomputeTreeMetadata(tree, x.parent!)
 
     if (yWasRed) {
         resetSentinel()
@@ -339,8 +339,9 @@ func rbDelete(_ tree: PieceTreeBase, _ z: TreeNode) {
     resetSentinel()
 }
 
-func fixInsert(_ tree: PieceTreeBase,  _ x: inout TreeNode) {
-    recomputeTreeMetadata(tree, &x)
+func fixInsert(_ tree: PieceTreeBase,  _ _x: TreeNode) {
+    var x = _x
+    recomputeTreeMetadata(tree, x)
 
     while (x !== tree.root && x.parent!.color == .red) {
         if (x.parent === x.parent!.parent!.left) {
@@ -396,7 +397,8 @@ func updateTreeMetadata(_ tree: PieceTreeBase, _ x: inout TreeNode, _ delta: Int
     }
 }
 
-func recomputeTreeMetadata(_ tree: PieceTreeBase, _ x: inout TreeNode) {
+func recomputeTreeMetadata(_ tree: PieceTreeBase, _ _x: TreeNode) {
+    var x = _x
     var delta = 0
     var lf_delta = 0;
     if (x === tree.root) {

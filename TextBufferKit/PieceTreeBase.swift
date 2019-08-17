@@ -290,7 +290,7 @@ public class PieceTreeBase {
     var lastVisitedLine: (lineNumber: Int, value: [UInt8]) = (0, [])
     
     /// Initializes the PieceTreeBase
-    /// - Parameter eol: must be a string either "\n" or "\r\n"
+    /// - Parameter eol: must be a String either "\n" or "\r\n"
     ///
     public init (chunks: inout [StringBuffer], eol: [UInt8], eolNormalized : Bool)
     {
@@ -339,7 +339,7 @@ public class PieceTreeBase {
         return PieceTreeSnapshot(tree: self, bom: bom);
     }
     
-    public func equal (left: PieceTreeBase, right: PieceTreeBase) -> Bool
+    public static func equal (left: PieceTreeBase, right: PieceTreeBase) -> Bool
     {
         if left.length != right.length {
             return false
@@ -512,8 +512,17 @@ public class PieceTreeBase {
         } else if eolNormalized {
             lastVisitedLine.value = getLineRawContent (lineNumber, eolLength)
         } else {
-            // TODO
-            lastVisitedLine.value = getLineRawContent(lineNumber)
+            var l = getLineRawContent(lineNumber)
+            let len = l.count
+            if len > 1 {
+                if len > 2 && l [len-2] == 13 && l [len-1] == 10 {
+                    l.removeLast(2)
+                } else if l [len-1] == 10 || l [len-1] == 13 {
+                    l.removeLast()
+                }
+            }
+            lastVisitedLine.value = l
+            
             // lastVisitedLine.value = getLineRawContent(lineNumber).replace(/(\r\n|\r|\n)$/, '');
         }
 
@@ -873,7 +882,7 @@ public class PieceTreeBase {
         var text = _text[0..<_text.count]
         
         if text.count > AverageBufferSize {
-            // the content is large, operations like substring, charCode becomes slow
+            // the content is large, operations like subString, charCode becomes slow
             // so here we split it into smaller chunks, just like what we did for CR/LF normalization
             var newPieces: [Piece] = []
             while text.count > AverageBufferSize {
@@ -1454,7 +1463,7 @@ public class PieceTreeBase {
             z.parent = nextNode
         }
 
-        fixInsert(self, &z)
+        fixInsert(self, z)
         return z
     }
     
@@ -1486,7 +1495,7 @@ public class PieceTreeBase {
             z.parent = prevNode
         }
 
-        fixInsert(self, &z);
+        fixInsert(self, z);
         return z
     }
     
