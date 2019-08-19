@@ -562,7 +562,153 @@ public class PieceTreeBase {
         return getOffsetAt(lineNumber + 1, 1) - getOffsetAt(lineNumber, 1) - eolLength
     }
     
-    
+//    public func findMatchesInNode(node: TreeNode, searcher: Searcher, startLineNumber: Int, startColumn: Int, startCursor: BufferCursor, endCursor: BufferCursor, searchData: SearchData, captureMatches: Bool, limitResultCount: Int, resultLen _resultLen: Int, _result: inout [FindMatch]) -> Int{
+//        var resultLen = _resultLen
+//        let buffer = buffers[node.piece.bufferIndex]
+//        let startOffsetInBuffer = offsetInBuffer(node.piece.bufferIndex, node.piece.start)
+//        let start = offsetInBuffer(node.piece.bufferIndex, startCursor)
+//        let end = offsetInBuffer(node.piece.bufferIndex, endCursor)
+//
+//        let m: RegExpExecArray? = nil
+//        // Reset regex to search from the beginning
+//        searcher.reset(start);
+//        let ret = BufferCursor (line: 0, column: 0)
+//
+//        repeat {
+//            m = searcher.next(buffer.buffer)
+//
+//            if (m) {
+//                if (m.index >= end) {
+//                    return resultLen
+//                }
+//                positionInBuffer(node, m.index - startOffsetInBuffer, ret)
+//                let lineFeedCnt = getLineFeedCount(bufferIndex: node.piece.bufferIndex, start: startCursor, end: ret)
+//                let retStartColumn = ret.line == startCursor.line ? ret.column - startCursor.column + startColumn : ret.column + 1
+//                let retEndColumn = retStartColumn + m[0].count
+//                result[resultLen++] = createFindMatch(Range(startLineNumber + lineFeedCnt, retStartColumn, startLineNumber + lineFeedCnt, retEndColumn), m, captureMatches)
+//
+//                resultLen += 1
+//                if (m.index + m[0].length >= end) {
+//                    return resultLen
+//                }
+//                if (resultLen >= limitResultCount) {
+//                    return resultLen
+//                }
+//            }
+//
+//        } while m
+//
+//        return resultLen
+//    }
+//    public findMatchesLineByLine(searchRange: Range, searchData: SearchData, captureMatches: boolean, limitResultCount: number): FindMatch[] {
+//        const result: FindMatch[] = [];
+//        let resultLen = 0;
+//        const searcher = new Searcher(searchData.wordSeparators, searchData.regex);
+//
+//        let startPosition = this.nodeAt2(searchRange.startLineNumber, searchRange.startColumn);
+//        if (startPosition === null) {
+//            return [];
+//        }
+//        let endPosition = this.nodeAt2(searchRange.endLineNumber, searchRange.endColumn);
+//        if (endPosition === null) {
+//            return [];
+//        }
+//        let start = this.positionInBuffer(startPosition.node, startPosition.remainder);
+//        let end = this.positionInBuffer(endPosition.node, endPosition.remainder);
+//
+//        if (startPosition.node === endPosition.node) {
+//            this.findMatchesInNode(startPosition.node, searcher, searchRange.startLineNumber, searchRange.startColumn, start, end, searchData, captureMatches, limitResultCount, resultLen, result);
+//            return result;
+//        }
+//
+//        let startLineNumber = searchRange.startLineNumber;
+//
+//        let currentNode = startPosition.node;
+//        while (currentNode !== endPosition.node) {
+//            let lineBreakCnt = this.getLineFeedCnt(currentNode.piece.bufferIndex, start, currentNode.piece.end);
+//
+//            if (lineBreakCnt >= 1) {
+//                // last line break position
+//                let lineStarts = this._buffers[currentNode.piece.bufferIndex].lineStarts;
+//                let startOffsetInBuffer = this.offsetInBuffer(currentNode.piece.bufferIndex, currentNode.piece.start);
+//                let nextLineStartOffset = lineStarts[start.line + lineBreakCnt];
+//                let startColumn = startLineNumber === searchRange.startLineNumber ? searchRange.startColumn : 1;
+//                resultLen = this.findMatchesInNode(currentNode, searcher, startLineNumber, startColumn, start, this.positionInBuffer(currentNode, nextLineStartOffset - startOffsetInBuffer), searchData, captureMatches, limitResultCount, resultLen, result);
+//
+//                if (resultLen >= limitResultCount) {
+//                    return result;
+//                }
+//
+//                startLineNumber += lineBreakCnt;
+//            }
+//
+//            let startColumn = startLineNumber === searchRange.startLineNumber ? searchRange.startColumn - 1 : 0;
+//            // search for the remaining content
+//            if (startLineNumber === searchRange.endLineNumber) {
+//                const text = this.getLineContent(startLineNumber).substring(startColumn, searchRange.endColumn - 1);
+//                resultLen = this._findMatchesInLine(searchData, searcher, text, searchRange.endLineNumber, startColumn, resultLen, result, captureMatches, limitResultCount);
+//                return result;
+//            }
+//
+//            resultLen = this._findMatchesInLine(searchData, searcher, this.getLineContent(startLineNumber).substr(startColumn), startLineNumber, startColumn, resultLen, result, captureMatches, limitResultCount);
+//
+//            if (resultLen >= limitResultCount) {
+//                return result;
+//            }
+//
+//            startLineNumber++;
+//            startPosition = this.nodeAt2(startLineNumber, 1);
+//            currentNode = startPosition.node;
+//            start = this.positionInBuffer(startPosition.node, startPosition.remainder);
+//        }
+//
+//        if (startLineNumber === searchRange.endLineNumber) {
+//            let startColumn = startLineNumber === searchRange.startLineNumber ? searchRange.startColumn - 1 : 0;
+//            const text = this.getLineContent(startLineNumber).substring(startColumn, searchRange.endColumn - 1);
+//            resultLen = this._findMatchesInLine(searchData, searcher, text, searchRange.endLineNumber, startColumn, resultLen, result, captureMatches, limitResultCount);
+//            return result;
+//        }
+//
+//        let startColumn = startLineNumber === searchRange.startLineNumber ? searchRange.startColumn : 1;
+//        resultLen = this.findMatchesInNode(endPosition.node, searcher, startLineNumber, startColumn, start, end, searchData, captureMatches, limitResultCount, resultLen, result);
+//        return result;
+//    }
+//
+//    private _findMatchesInLine(searchData: SearchData, searcher: Searcher, text: string, lineNumber: number, deltaOffset: number, resultLen: number, result: FindMatch[], captureMatches: boolean, limitResultCount: number): number {
+//        const wordSeparators = searchData.wordSeparators;
+//        if (!captureMatches && searchData.simpleSearch) {
+//            const searchString = searchData.simpleSearch;
+//            const searchStringLen = searchString.length;
+//            const textLength = text.length;
+//
+//            let lastMatchIndex = -searchStringLen;
+//            while ((lastMatchIndex = text.indexOf(searchString, lastMatchIndex + searchStringLen)) !== -1) {
+//                if (!wordSeparators || isValidMatch(wordSeparators, text, textLength, lastMatchIndex, searchStringLen)) {
+//                    result[resultLen++] = new FindMatch(new Range(lineNumber, lastMatchIndex + 1 + deltaOffset, lineNumber, lastMatchIndex + 1 + searchStringLen + deltaOffset), null);
+//                    if (resultLen >= limitResultCount) {
+//                        return resultLen;
+//                    }
+//                }
+//            }
+//            return resultLen;
+//        }
+//
+//        let m: RegExpExecArray | null;
+//        // Reset regex to search from the beginning
+//        searcher.reset(0);
+//        do {
+//            m = searcher.next(text);
+//            if (m) {
+//                result[resultLen++] = createFindMatch(new Range(lineNumber, m.index + 1 + deltaOffset, lineNumber, m.index + 1 + m[0].length + deltaOffset), m, captureMatches);
+//                if (resultLen >= limitResultCount) {
+//                    return resultLen;
+//                }
+//            }
+//        } while (m);
+//        return resultLen;
+//    }
+//
+
     func insert(offset: Int, value _value: [UInt8], eolNormalized: Bool = false)
     {
         var value = _value

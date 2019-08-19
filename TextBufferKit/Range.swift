@@ -11,6 +11,22 @@ import Foundation
 
 /// A range in the editor. (startLineNumber,startColumn) is <= (endLineNumber,endColumn)
 public struct Range {
+    // negative if a < b
+    // zero if a == b
+    // positive if a > b
+    public static func compareUsingEnds (_ a: Range, _ b: Range) -> Int {
+        if (a.endLineNumber == b.endLineNumber) {
+                if (a.endColumn == b.endColumn) {
+                        if (a.startLineNumber == b.startLineNumber) {
+                                return a.startColumn - b.startColumn;
+                        }
+                        return a.startLineNumber - b.startLineNumber;
+                }
+                return a.endColumn - b.endColumn;
+        }
+        return a.endLineNumber - b.endLineNumber;
+    }
+    
     /// Line number on which the range starts (starts at 1).
     public var startLineNumber: Int
     /// Column on which the range starts in line `startLineNumber` (starts at 1).
@@ -23,5 +39,15 @@ public struct Range {
     public func isEmpty() ->Bool
     {
         startLineNumber == endLineNumber && startColumn == endColumn
+    }
+
+    public func getEndPosition () -> Position
+    {
+        return Position(line: endLineNumber, column: endColumn)
+    }
+    
+    public func getStartPosition() -> Position
+    {
+        return Position(line: startLineNumber, column: startColumn)
     }
 }

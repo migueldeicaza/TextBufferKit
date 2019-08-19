@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		4937E584230AFF160088B60C /* SearchData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4937E583230AFF160088B60C /* SearchData.swift */; };
+		4937E586230B00930088B60C /* FindMatch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4937E585230B00930088B60C /* FindMatch.swift */; };
 		49398DCA2306644700233F9F /* PieceTreeBase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49398DC52306644600233F9F /* PieceTreeBase.swift */; };
 		49398DCB2306644700233F9F /* Position.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49398DC62306644600233F9F /* Position.swift */; };
 		49398DCC2306644700233F9F /* Range.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49398DC72306644700233F9F /* Range.swift */; };
@@ -29,6 +31,8 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		4937E583230AFF160088B60C /* SearchData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchData.swift; sourceTree = "<group>"; };
+		4937E585230B00930088B60C /* FindMatch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FindMatch.swift; sourceTree = "<group>"; };
 		49398DC52306644600233F9F /* PieceTreeBase.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PieceTreeBase.swift; sourceTree = "<group>"; };
 		49398DC62306644600233F9F /* Position.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Position.swift; sourceTree = "<group>"; };
 		49398DC72306644700233F9F /* Range.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Range.swift; sourceTree = "<group>"; };
@@ -91,6 +95,8 @@
 				49398DC72306644700233F9F /* Range.swift */,
 				49398DC92306644700233F9F /* TreeBase.swift */,
 				49398DCF2307B2C700233F9F /* PieceTreeTextBuffer.swift */,
+				4937E583230AFF160088B60C /* SearchData.swift */,
+				4937E585230B00930088B60C /* FindMatch.swift */,
 			);
 			path = TextBufferKit;
 			sourceTree = "<group>";
@@ -214,8 +220,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4937E586230B00930088B60C /* FindMatch.swift in Sources */,
 				49398DCC2306644700233F9F /* Range.swift in Sources */,
 				49398DCB2306644700233F9F /* Position.swift in Sources */,
+				4937E584230AFF160088B60C /* SearchData.swift in Sources */,
 				49398DCE2306644700233F9F /* TreeBase.swift in Sources */,
 				49398DCD2306644700233F9F /* PieceTreeBuilder.swift in Sources */,
 				49398DCA2306644700233F9F /* PieceTreeBase.swift in Sources */,

@@ -14,7 +14,7 @@ struct IValidatedEditOperation {
     var range: Range
     var rangeOffset: Int
     var rangeLength: Int
-    var lines: [String]?
+    var lines: [[UInt8]]?
     var forceMoveMarkers: Bool
     var isAutoWhitespaceEdit: Bool
 }
@@ -33,7 +33,7 @@ public struct IIdentifiedSingleEditOperation {
     /// The range to replace. This can be empty to emulate a simple insert.
     public var range: Range
     /// The text to replace with. This can be null to emulate a simple delete.
-    public var text: String
+    public var text: String?
     /// This indicates that this operation has "insert" semantics.
     /// This indicates that this operation has "insert" semantics.
     public var forceMoveMarkers: Bool
@@ -173,21 +173,46 @@ class PieceTreeTextBuffer {
         return getLineLength(lineNumber: lineNumber) + 1
     }
 
-    //public func getLineFirstNonWhitespaceColumn(lineNumber: Int) ->  Int {
-    //    let result = Strings.firstNonWhitespaceIndex(getLineContent(lineNumber))
-    //    if (result === -1) {
-    //        return 0
-    //    }
-    //    return result + 1
-    //}
+    static func firstNonWhitespaceIndex (_ str: [UInt8]) -> Int
+    {
+        let top = str.count
+        var i = 0
+        while i < top {
+            let code = str [i]
+            if code != 32 /* space */ && code != 9 /* tab */ {
+                return i
+            }
+            i += 1
+        }
+        return -1
+    }
+    
+    func getLineFirstNonWhitespaceColumn(lineNumber: Int) ->  Int {
+        let result = Self.firstNonWhitespaceIndex(getLineContent(lineNumber: lineNumber))
+        if result == -1 {
+            return 0
+        }
+        return result + 1
+    }
+    
+    static func lastNonWhitespaceIndex(_ str: [UInt8], startIndex: Int = -1) -> Int
+    {
+        for i in (0..<(startIndex == -1 ? str.count-1 : startIndex)).reversed() {
+            let code = str [i]
+            if code != 32 /* space */ && code != 9 /* TAB */ {
+                return i
+            }
+        }
+        return -1
+    }
 
-    //public func getLineLastNonWhitespaceColumn(lineNumber: Int) ->  Int {
-    //    const result = Strings.lastNonWhitespaceIndex(getLineContent(lineNumber))
-    //    if (result === -1) {
-    //        return 0
-    //    }
-    //    return result + 2
-    //}
+    public func getLineLastNonWhitespaceColumn(lineNumber: Int) ->  Int {
+        let result = Self.lastNonWhitespaceIndex(getLineContent(lineNumber: lineNumber))
+        if result == -1 {
+            return 0
+        }
+        return result + 2
+    }
 
     func _getEndOfLine(eol: EndOfLinePreference) ->  [UInt8] {
         switch (eol) {
@@ -201,69 +226,104 @@ class PieceTreeTextBuffer {
         return [10]
     }
 
-//
-//    func splitText (_ txt: String?) -> [String]?
-//    {
-//        if let txt2 = txt {
-//            return txt2.split({ ch in
-//                return ch == "\n" || "\r"
-//            })
-//        }
-//        return nil
-//    }
-//    
-//    public func applyEdits(rawOperations: [IIdentifiedSingleEditOperation], recordTrimAutoWhitespace: Bool) ->  ApplyEditsResult
-//    {
-//        var mightContainRTL = mightContainRTL
-//        var canReduceOperations = true
-//
-//        var operations: [IValidatedEditOperation] = []
-//        for i in 0..<rawOperations.count {
-//            let op = rawOperations[i]
-//            if (canReduceOperations && op.isTracked) {
-//                canReduceOperations = false
-//            }
-//            let validatedRange = op.range
-//            if (!mightContainRTL && op.text) {
-//                // check if the new inserted text contains RTL
-//                mightContainRTL = Strings.containsRTL(op.text)
-//            }
-//            if (!mightContainNonBasicASCII && op.text != nil) {
-//                mightContainNonBasicASCII = !Strings.isBasicASCII(op.text)
-//            }
-//            operations[i] = IValidatedEditOperation(
-//                sortIndex: i,
-//                identifier: op.identifier,
-//                range: validatedRange,
-//                rangeOffset:  getOffsetAt(lineNumber: validatedRange.startLineNumber, column: validatedRange.startColumn),
-//                rangeLength: getValueLengthInRange(range: validatedRange),
-//                lines: splitText (op.text),
-//                forceMoveMarkers: op.forceMoveMarkers,
-//                isAutoWhitespaceEdit: op.isAutoWhitespaceEdit ?? false)
-//                
-//        }
-//
-//        // Sort operations ascending
-//        operations.sort(PieceTreeTextBuffer._sortOpsAscending)
-//
-//        let hasTouchingRanges = false
-//        for (let i = 0, count = operations.length - 1; i < count; i++) {
-//            let rangeEnd = operations[i].range.getEndPosition()
-//            let nextRangeStart = operations[i + 1].range.getStartPosition()
-//
-//            if (nextRangeStart.isBeforeOrEqual(rangeEnd)) {
-//                if (nextRangeStart.isBefore(rangeEnd)) {
-//                    // overlapping ranges
-//                    throw new Error('Overlapping ranges are not allowed!')
-//                }
-//                hasTouchingRanges = true
-//            }
-//        }
-//
-//        if (canReduceOperations) {
-//            operations = _reduceOperations(operations)
-//        }
-//
+
+    func splitText (_ txt: String?) -> [[UInt8]]?
+    {
+        if let txt2 = txt {
+            let normalized = txt2.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "\n");
+            let split = normalized.split (separator: "\n").map({sub in String (sub)})
+            var result : [[UInt8]] = []
+            for line in split {
+                result.append (Array(line.utf8))
+            }
+        }
+        return nil
+    }
+    
+    static func containsRTL (_ str: String) -> Bool
+    {
+        // TODO: needs to scan the string to determine if it contains RTL characters.
+        return false
+    }
+    
+    static func isBasicASCII (_ str: String) -> Bool
+    {
+        for c in str {
+            if let a = c.asciiValue {
+                if !(a == 9 /* TAB */ || a == 10 || a == 13 || (a >= 0x20 && a <= 0x7e)) {
+                    return false
+                }
+            } else {
+                return false
+            }
+        }
+        return true
+    }
+    
+    public enum UsageError : Error {
+        case overlappingRanges
+    }
+    
+    public func applyEdits(rawOperations: [IIdentifiedSingleEditOperation], recordTrimAutoWhitespace: Bool) throws ->  ApplyEditsResult
+    {
+        var mightContainRTL = self.mightContainRTL
+        var canReduceOperations = true
+
+        var operations: [IValidatedEditOperation] = []
+        for i in 0..<rawOperations.count {
+            let op = rawOperations[i]
+            if (canReduceOperations && op.isTracked) {
+                canReduceOperations = false
+            }
+            let validatedRange = op.range
+            if let optext = op.text {
+                if !mightContainRTL {
+                    // check if the new inserted text contains RTL
+                    mightContainRTL = Self.containsRTL(optext)
+                }
+                if !mightContainNonBasicASCII {
+                    mightContainNonBasicASCII = !Self.isBasicASCII(optext)
+                }
+            }
+            operations[i] = IValidatedEditOperation(
+                sortIndex: i,
+                identifier: op.identifier,
+                range: validatedRange,
+                rangeOffset:  getOffsetAt(lineNumber: validatedRange.startLineNumber, column: validatedRange.startColumn),
+                rangeLength: getValueLengthInRange(range: validatedRange),
+                lines: splitText (op.text),
+                forceMoveMarkers: op.forceMoveMarkers,
+                isAutoWhitespaceEdit: op.isAutoWhitespaceEdit ?? false)
+                
+        }
+
+        // Sort operations ascending
+        operations.sort(by: { a, b in
+            let r = Range.compareUsingEnds(a.range, b.range)
+            if (r == 0) {
+                return (a.sortIndex - b.sortIndex) < 0
+            }
+            return r < 0
+        })
+
+        var hasTouchingRanges = false
+        for i in 0..<operations.count-1 {
+            let rangeEnd = operations[i].range.getEndPosition()
+            let nextRangeStart = operations[i + 1].range.getStartPosition()
+
+            if (nextRangeStart.isBeforeOrEqual(rangeEnd)) {
+                if (nextRangeStart.isBefore(rangeEnd)) {
+                    // overlapping ranges
+                    throw UsageError.overlappingRanges
+                }
+                hasTouchingRanges = true
+            }
+        }
+
+        if (canReduceOperations) {
+            operations = _reduceOperations(operations: operations)
+        }
+
 //        // Delta encode operations
 //        let reverseRanges = PieceTreeTextBuffer._getInverseEditRanges(operations)
 //        let newTrimAutoWhitespaceCandidates: { lineNumber: Int, oldContent: String }[] = []
@@ -340,140 +400,155 @@ class PieceTreeTextBuffer {
 //            contentChanges,
 //            trimAutoWhitespacelineNumbers
 //        )
-//    }
-//
-//    /**
-//     * Transform operations such that they represent the same logic edit,
-//     * but that they also do not cause OOM crashes.
-//     */
-//    private _reduceOperations(operations: IValidatedEditOperation[]) ->  IValidatedEditOperation[] {
-//        if (operations.length < 1000) {
-//            // We know from empirical testing that a thousand edits work fine regardless of their shape.
-//            return operations
-//        }
-//
-//        // At one point, due to how events are emitted and how each operation is handled,
-//        // some operations can trigger a high amount of temporary String allocations,
-//        // that will immediately get edited again.
-//        // e.g. a formatter inserting ridiculous ammounts of \n on a model with a single line
-//        // Therefore, the strategy is to collapse all the operations into a huge single edit operation
-//        return [_toSingleEditOperation(operations)]
-//    }
-//
-//    _toSingleEditOperation(operations: IValidatedEditOperation[]) ->  IValidatedEditOperation {
-//        let forceMoveMarkers = false,
-//            firstEditRange = operations[0].range,
-//            lastEditRange = operations[operations.length - 1].range,
-//            entireEditRange = new Range(firstEditRange.startLineNumber, firstEditRange.startColumn, lastEditRange.endLineNumber, lastEditRange.endColumn),
-//            lastendLineNumber = firstEditRange.startLineNumber,
-//            lastEndColumn = firstEditRange.startColumn,
-//            result: String[] = []
-//
-//        for (let i = 0, len = operations.length; i < len; i++) {
-//            let operation = operations[i],
-//                range = operation.range
-//
-//            forceMoveMarkers = forceMoveMarkers || operation.forceMoveMarkers
-//
-//            // (1) -- Push old text
-//            for (let lineNumber = lastendLineNumber; lineNumber < range.startLineNumber; lineNumber++) {
-//                if (lineNumber === lastendLineNumber) {
-//                    result.push(getLineContent(lineNumber).subString(lastEndColumn - 1))
-//                } else {
-//                    result.push('\n')
-//                    result.push(getLineContent(lineNumber))
-//                }
-//            }
-//
-//            if (range.startLineNumber === lastendLineNumber) {
-//                result.push(getLineContent(range.startLineNumber).subString(lastEndColumn - 1, range.startColumn - 1))
-//            } else {
-//                result.push('\n')
-//                result.push(getLineContent(range.startLineNumber).subString(0, range.startColumn - 1))
-//            }
-//
-//            // (2) -- Push new text
-//            if (operation.lines) {
-//                for (let j = 0, lenJ = operation.lines.length; j < lenJ; j++) {
-//                    if (j !== 0) {
-//                        result.push('\n')
-//                    }
-//                    result.push(operation.lines[j])
-//                }
-//            }
-//
-//            lastendLineNumber = operation.range.endLineNumber
-//            lastEndColumn = operation.range.endColumn
-//        }
-//
-//        return {
-//            sortIndex: 0,
-//            identifier: operations[0].identifier,
-//            range: entireEditRange,
-//            rangeOffset: getOffsetAt(entireEditRange.startLineNumber, entireEditRange.startColumn),
-//            rangeLength: getValueLengthInRange(entireEditRange, EndOfLinePreference.TextDefined),
-//            lines: result.join('').split('\n'),
-//            forceMoveMarkers: forceMoveMarkers,
-//            isAutoWhitespaceEdit: false
-//        }
-//    }
-//
-//    func _doApplyEdits(operations: [IValidatedEditOperation]) ->  [IInternalModelContentChange]
-//    {
-//        operations.sort(PieceTreeTextBuffer._sortOpsDescending)
-//
-//        let contentChanges: IInternalModelContentChange[] = []
-//
-//        // operations are from bottom to top
-//        for (let i = 0; i < operations.length; i++) {
-//            let op = operations[i]
-//
-//            const startLineNumber = op.range.startLineNumber
-//            const startColumn = op.range.startColumn
-//            const endLineNumber = op.range.endLineNumber
-//            const endColumn = op.range.endColumn
-//
-//            if (startLineNumber === endLineNumber && startColumn === endColumn && (!op.lines || op.lines.length === 0)) {
-//                // no-op
-//                continue
-//            }
-//
-//            const deletingLinesCnt = endLineNumber - startLineNumber
-//            const insertingLinesCnt = (op.lines ? op.lines.length - 1 : 0)
-//            const editingLinesCnt = Math.min(deletingLinesCnt, insertingLinesCnt)
-//
-//            const text = (op.lines ? op.lines.join(getEOL()) : '')
-//
-//            if (text) {
-//                // replacement
-//                pieceTree.delete(op.rangeOffset, op.rangeLength)
-//                pieceTree.insert(op.rangeOffset, text, true)
-//
-//            } else {
-//                // deletion
-//                pieceTree.delete(op.rangeOffset, op.rangeLength)
-//            }
-//
-//            if (editingLinesCnt < insertingLinesCnt) {
-//                let newLinesContent: String[] = []
-//                for (let j = editingLinesCnt + 1; j <= insertingLinesCnt; j++) {
-//                    newLinesContent.push(op.lines![j])
-//                }
-//
-//                newLinesContent[newLinesContent.length - 1] = getLineContent(startLineNumber + insertingLinesCnt - 1)
-//            }
-//
-//            const contentChangeRange = new Range(startLineNumber, startColumn, endLineNumber, endColumn)
-//            contentChanges.push({
-//                range: contentChangeRange,
-//                rangeLength: op.rangeLength,
-//                text: text,
-//                rangeOffset: op.rangeOffset,
-//                forceMoveMarkers: op.forceMoveMarkers
-//            })
-//        }
-//        return contentChanges
-//    }
+    }
+
+    /**
+     * Transform operations such that they represent the same logic edit,
+     * but that they also do not cause OOM crashes.
+     */
+    func _reduceOperations(operations: [IValidatedEditOperation]) ->  [IValidatedEditOperation] {
+        if operations.count < 1000 {
+            // We know from empirical testing that a thousand edits work fine regardless of their shape.
+            return operations
+        }
+
+        // At one point, due to how events are emitted and how each operation is handled,
+        // some operations can trigger a high amount of temporary String allocations,
+        // that will immediately get edited again.
+        // e.g. a formatter inserting ridiculous ammounts of \n on a model with a single line
+        // Therefore, the strategy is to collapse all the operations into a huge single edit operation
+        return [_toSingleEditOperation(operations)]
+    }
+
+    func _toSingleEditOperation(_ operations: [IValidatedEditOperation]) -> IValidatedEditOperation
+    {
+        var forceMoveMarkers = false
+        let firstEditRange = operations[0].range
+        let lastEditRange = operations[operations.count - 1].range
+        let entireEditRange = Range(startLineNumber: firstEditRange.startLineNumber, startColumn: firstEditRange.startColumn, endLineNumber: lastEditRange.endLineNumber, endColumn: lastEditRange.endColumn)
+        var lastendLineNumber = firstEditRange.startLineNumber
+        var lastEndColumn = firstEditRange.startColumn
+        var result: [UInt8] = []
+
+        for operation in operations {
+            let range = operation.range
+
+            forceMoveMarkers = forceMoveMarkers || operation.forceMoveMarkers
+
+            // (1) -- Push old text
+            for lineNumber in lastendLineNumber..<range.startLineNumber {
+                if (lineNumber == lastendLineNumber) {
+                    result.append(contentsOf: getLineContent(lineNumber: lineNumber) [(lastEndColumn-1)...])
+                } else {
+                    result.append (10)
+                    result.append(contentsOf: getLineContent(lineNumber: lineNumber))
+                }
+            }
+
+            if (range.startLineNumber == lastendLineNumber) {
+                result.append (contentsOf: getLineContent(lineNumber: range.startLineNumber) [(lastEndColumn - 1)..<(range.startColumn - 1)])
+            } else {
+                result.append (10)
+                result.append(contentsOf: getLineContent(lineNumber: range.startLineNumber) [0..<(range.startColumn - 1)])
+            }
+
+            // (2) -- Push new text
+            if let oplines = operation.lines {
+                var j = 0
+                let lenJ = oplines.count
+                while j < lenJ {
+                    if (j != 0) {
+                        result.append (10)
+                    }
+                    result.append(contentsOf: oplines[j])
+                    j += 1
+                }
+            }
+
+            lastendLineNumber = operation.range.endLineNumber
+            lastEndColumn = operation.range.endColumn
+        }
+
+        let llines = result.split(separator: 10, maxSplits: Int.max, omittingEmptySubsequences: false).map ({ Array ($0) })
+        
+        return IValidatedEditOperation (sortIndex: 0,
+                                        identifier: operations [0].identifier,
+                                        range: entireEditRange,
+                                        rangeOffset: getOffsetAt(lineNumber: entireEditRange.startLineNumber, column: entireEditRange.startColumn),
+                                        rangeLength: getValueLengthInRange(range: entireEditRange),
+                                        lines: llines,
+                                        forceMoveMarkers: forceMoveMarkers,
+                                        isAutoWhitespaceEdit: false)
+    }
+
+    struct IInternalModelContentChange {
+        var range: Range
+        var rangeOffset: Int
+        var rangeLength: Int
+        var text: [UInt8]
+        var forceMoveMarkers: Bool
+    }
+    
+    func _doApplyEdits(operations: inout [IValidatedEditOperation]) -> [IInternalModelContentChange]
+    {
+        operations.sort(by: { a, b in
+            let r = Range.compareUsingEnds(a.range, b.range)
+            if (r == 0) {
+                return (a.sortIndex - b.sortIndex) > 0
+            }
+            return r > 0
+        })
+
+        var contentChanges: [IInternalModelContentChange] = []
+
+        // operations are from bottom to top
+        for op in operations {
+            let startLineNumber = op.range.startLineNumber
+            let startColumn = op.range.startColumn
+            let endLineNumber = op.range.endLineNumber
+            let endColumn = op.range.endColumn
+
+            if startLineNumber == endLineNumber && startColumn == endColumn && (op.lines != nil || op.lines!.count == 0) {
+                // no-op
+                continue
+            }
+
+            let deletingLinesCnt = endLineNumber - startLineNumber
+            let insertingLinesCnt = (op.lines != nil ? op.lines!.count - 1 : 0)
+            let editingLinesCnt = min(deletingLinesCnt, insertingLinesCnt)
+
+            let text : [UInt8] = (op.lines != nil ? Array (op.lines!.joined(separator: eol)) : [])
+
+            if text.count > 0 {
+                // replacement
+                pieceTree.delete(offset: op.rangeOffset, cnt: op.rangeLength)
+                pieceTree.insert(offset: op.rangeOffset, value: text, eolNormalized: true)
+
+            } else {
+                // deletion
+                pieceTree.delete(offset: op.rangeOffset, cnt: op.rangeLength)
+            }
+
+            if (editingLinesCnt < insertingLinesCnt) {
+                var newLinesContent: [[UInt8]] = []
+                for j in (editingLinesCnt + 1)..<insertingLinesCnt {
+                    newLinesContent.append (op.lines![j])
+                }
+
+                newLinesContent[newLinesContent.count - 1] = getLineContent(lineNumber: startLineNumber + insertingLinesCnt - 1)
+            }
+
+            let contentChangeRange = Range(startLineNumber: startLineNumber, startColumn: startColumn, endLineNumber: endLineNumber, endColumn: endColumn)
+            contentChanges.append(IInternalModelContentChange(
+                range: contentChangeRange,
+                rangeOffset: op.rangeOffset,
+                rangeLength: op.rangeLength,
+                text: text,
+                forceMoveMarkers: op.forceMoveMarkers
+            ))
+        }
+        return contentChanges
+    }
 //
 //    func findMatchesLineByLine(searchRange: Range, searchData: SearchData, captureMatches: Bool, limitResultCount: Int) ->  [FindMatch]
 //    {
@@ -488,64 +563,62 @@ class PieceTreeTextBuffer {
 //        return pieceTree
 //    }
 //    
-//    /**
-//     * Assumes `operations` are validated and sorted ascending
-//     */
-//    public func static _getInverseEditRanges(operations: [IValidatedEditOperation]) ->  [Range] {
-//        let result: Range[] = []
-//
-//        let prevOpendLineNumber: Int = 0
-//        let prevOpEndColumn: Int = 0
-//        let prevOp: IValidatedEditOperation | null = null
-//        for (let i = 0, len = operations.length; i < len; i++) {
-//            let op = operations[i]
-//
-//            let startLineNumber: Int
-//            let startColumn: Int
-//
-//            if (prevOp) {
-//                if (prevOp.range.endLineNumber === op.range.startLineNumber) {
-//                    startLineNumber = prevOpendLineNumber
-//                    startColumn = prevOpEndColumn + (op.range.startColumn - prevOp.range.endColumn)
-//                } else {
-//                    startLineNumber = prevOpendLineNumber + (op.range.startLineNumber - prevOp.range.endLineNumber)
-//                    startColumn = op.range.startColumn
-//                }
-//            } else {
-//                startLineNumber = op.range.startLineNumber
-//                startColumn = op.range.startColumn
-//            }
-//
-//            let resultRange: Range
-//
-//            if (op.lines && op.lines.length > 0) {
-//                // the operation inserts something
-//                let lineCount = op.lines.length
-//                let firstLine = op.lines[0]
-//                let lastLine = op.lines[lineCount - 1]
-//
-//                if (lineCount === 1) {
-//                    // single line insert
-//                    resultRange = new Range(startLineNumber, startColumn, startLineNumber, startColumn + firstLine.length)
-//                } else {
-//                    // multi line insert
-//                    resultRange = new Range(startLineNumber, startColumn, startLineNumber + lineCount - 1, lastLine.length + 1)
-//                }
-//            } else {
-//                // There is nothing to insert
-//                resultRange = new Range(startLineNumber, startColumn, startLineNumber, startColumn)
-//            }
-//
-//            prevOpendLineNumber = resultRange.endLineNumber
-//            prevOpEndColumn = resultRange.endColumn
-//
-//            result.push(resultRange)
-//            prevOp = op
-//        }
-//
-//        return result
-//    }
-//
+    /**
+     * Assumes `operations` are validated and sorted ascending
+     */
+    public static func _getInverseEditRanges(operations: [IValidatedEditOperation]) ->  [Range] {
+        var result: [Range] = []
+        var prevOpendLineNumber: Int = 0
+        var prevOpEndColumn: Int = 0
+        var prevOpNil: IValidatedEditOperation? = nil
+        for op in operations {
+            var startLineNumber: Int
+            var startColumn: Int
+
+            if let prevOp = prevOpNil {
+                if prevOp.range.endLineNumber == op.range.startLineNumber {
+                    startLineNumber = prevOpendLineNumber
+                    startColumn = prevOpEndColumn + (op.range.startColumn - prevOp.range.endColumn)
+                } else {
+                    startLineNumber = prevOpendLineNumber + (op.range.startLineNumber - prevOp.range.endLineNumber)
+                    startColumn = op.range.startColumn
+                }
+            } else {
+                startLineNumber = op.range.startLineNumber
+                startColumn = op.range.startColumn
+            }
+
+            var resultRange: Range
+
+            if op.lines != nil && op.lines!.count > 0{
+                let oplines = op.lines!
+                let lineCount = oplines.count
+                // the operation inserts something
+                let firstLine = oplines[0]
+                let lastLine = oplines[lineCount - 1]
+
+                if lineCount == 1 {
+                    // single line insert
+                    resultRange = Range(startLineNumber: startLineNumber, startColumn: startColumn, endLineNumber: startLineNumber, endColumn: startColumn + firstLine.count)
+                } else {
+                    // multi line insert
+                    resultRange = Range(startLineNumber: startLineNumber, startColumn: startColumn, endLineNumber: startLineNumber + lineCount - 1, endColumn: lastLine.count + 1)
+                }
+            } else {
+                // There is nothing to insert
+                resultRange = Range(startLineNumber: startLineNumber, startColumn: startColumn, endLineNumber: startLineNumber, endColumn: startColumn)
+            }
+
+            prevOpendLineNumber = resultRange.endLineNumber
+            prevOpEndColumn = resultRange.endColumn
+
+            result.append (resultRange)
+            prevOpNil = op
+        }
+
+        return result
+    }
+
 //    func static _sortOpsAscending(a: IValidatedEditOperation, b: IValidatedEditOperation) ->  Int
 //    {
 //        let r = Range.compareRangesUsingEnds(a.range, b.range)
