@@ -8,9 +8,9 @@
 // https://github.com/microsoft/vscode/blob/master/src/vs/editor/common/model/pieceTreeTextBuffer/pieceTreeTextBuffer.ts
 import Foundation
 
-struct IValidatedEditOperation {
+struct ValidatedEditOperation {
     var sortIndex: Int
-    var identifier: ISingleEditOperationIdentifier?
+    var identifier: SingleEditOperationIdentifier?
     var range: Range
     var rangeOffset: Int
     var rangeLength: Int
@@ -20,20 +20,20 @@ struct IValidatedEditOperation {
 }
 
 /// An identifier for a single edit operation.
-public struct ISingleEditOperationIdentifier {
+public struct SingleEditOperationIdentifier {
     /// Identifier major
     public var major : Int
     /// Identifier minor
     public var minor : Int
 }
 
-public struct IIdentifiedSingleEditOperation {
+public class IdentifiedSingleEditOperation {
     /// An identifier associated with this single edit operation.
-    public var identifier : ISingleEditOperationIdentifier
+    public var identifier : SingleEditOperationIdentifier?
     /// The range to replace. This can be empty to emulate a simple insert.
     public var range: Range
     /// The text to replace with. This can be null to emulate a simple delete.
-    public var text: String?
+    public var text: [UInt8]?
     /// This indicates that this operation has "insert" semantics.
     /// This indicates that this operation has "insert" semantics.
     public var forceMoveMarkers: Bool
@@ -42,6 +42,23 @@ public struct IIdentifiedSingleEditOperation {
     public var isAutoWhitespaceEdit: Bool?
     /// This indicates that this operation is in a set of operations that are tracked and should not be "simplified".
     var isTracked : Bool
+    
+    internal init(identifier: SingleEditOperationIdentifier?, range: Range, text: [UInt8]?, forceMoveMarkers: Bool, isAutoWhitespaceEdit: Bool?, isTracked: Bool) {
+        self.identifier = identifier
+        self.range = range
+        self.text = text
+        self.forceMoveMarkers = forceMoveMarkers
+        self.isAutoWhitespaceEdit = isAutoWhitespaceEdit
+        self.isTracked = isTracked
+    }
+}
+
+public class ReverseSingleEditOperation : IdentifiedSingleEditOperation {
+    var sortIndex: Int
+    internal init(sortIndex: Int, identifier: SingleEditOperationIdentifier?, range: Range, text: [UInt8]?, forceMoveMarkers: Bool, isAutoWhitespaceEdit: Bool?, isTracked: Bool) {
+        self.sortIndex = sortIndex
+        super.init (identifier: identifier, range: range, text: text, forceMoveMarkers: forceMoveMarkers, isAutoWhitespaceEdit: isAutoWhitespaceEdit, isTracked: isTracked)
+    }
 }
 
 public enum EndOfLinePreference {
@@ -53,11 +70,18 @@ public enum EndOfLinePreference {
     case CRLF
 }
 
+public struct InternalModelContentChange {
+    var range: Range
+    var rangeOffset: Int
+    var rangeLength: Int
+    var text: [UInt8]
+    var forceMoveMarkers: Bool
+}
+
 public struct ApplyEditsResult {
-    public var reverseEdits: [IIdentifiedSingleEditOperation]
-    // public var rawChanges: [ModelRawChange]
-    // public var changes: [IInternalModelContentChange]
-    public var trimAutoWhitespaceLineNumbers: [Int]
+    public var reverseEdits: [IdentifiedSingleEditOperation]
+    public var changes: [InternalModelContentChange]
+    public var trimAutoWhitespaceLineNumbers: [Int]?
 }
 
 class PieceTreeTextBuffer {
@@ -223,36 +247,19 @@ class PieceTreeTextBuffer {
             case EndOfLinePreference.TextDefined:
                 return self.eol
         }
-        return [10]
     }
 
-
-    func splitText (_ txt: String?) -> [[UInt8]]?
-    {
-        if let txt2 = txt {
-            let normalized = txt2.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "\n");
-            let split = normalized.split (separator: "\n").map({sub in String (sub)})
-            var result : [[UInt8]] = []
-            for line in split {
-                result.append (Array(line.utf8))
-            }
-        }
-        return nil
-    }
-    
-    static func containsRTL (_ str: String) -> Bool
+    static func containsRTL (_ str: [UInt8]) -> Bool
     {
         // TODO: needs to scan the string to determine if it contains RTL characters.
         return false
     }
     
-    static func isBasicASCII (_ str: String) -> Bool
+    static func isBasicASCII (_ str: [UInt8]) -> Bool
     {
-        for c in str {
-            if let a = c.asciiValue {
-                if !(a == 9 /* TAB */ || a == 10 || a == 13 || (a >= 0x20 && a <= 0x7e)) {
-                    return false
-                }
+        for a in str {
+            if !(a == 9 /* TAB */ || a == 10 || a == 13 || (a >= 0x20 && a <= 0x7e)) {
+                return false
             } else {
                 return false
             }
@@ -264,12 +271,13 @@ class PieceTreeTextBuffer {
         case overlappingRanges
     }
     
-    public func applyEdits(rawOperations: [IIdentifiedSingleEditOperation], recordTrimAutoWhitespace: Bool) throws ->  ApplyEditsResult
+    public func applyEdits(rawOperations: [IdentifiedSingleEditOperation], recordTrimAutoWhitespace: Bool) throws ->  ApplyEditsResult
     {
         var mightContainRTL = self.mightContainRTL
+        var mightContainNonBasicASCII = self.mightContainNonBasicASCII;
         var canReduceOperations = true
 
-        var operations: [IValidatedEditOperation] = []
+        var operations: [ValidatedEditOperation] = []
         for i in 0..<rawOperations.count {
             let op = rawOperations[i]
             if (canReduceOperations && op.isTracked) {
@@ -285,13 +293,13 @@ class PieceTreeTextBuffer {
                     mightContainNonBasicASCII = !Self.isBasicASCII(optext)
                 }
             }
-            operations[i] = IValidatedEditOperation(
+            operations[i] = ValidatedEditOperation(
                 sortIndex: i,
                 identifier: op.identifier,
                 range: validatedRange,
                 rangeOffset:  getOffsetAt(lineNumber: validatedRange.startLineNumber, column: validatedRange.startColumn),
                 rangeLength: getValueLengthInRange(range: validatedRange),
-                lines: splitText (op.text),
+                lines: op.text != nil ? op.text!.split (separator: 10).map ({Array ($0)}) : nil,
                 forceMoveMarkers: op.forceMoveMarkers,
                 isAutoWhitespaceEdit: op.isAutoWhitespaceEdit ?? false)
                 
@@ -324,89 +332,93 @@ class PieceTreeTextBuffer {
             operations = _reduceOperations(operations: operations)
         }
 
-//        // Delta encode operations
-//        let reverseRanges = PieceTreeTextBuffer._getInverseEditRanges(operations)
-//        let newTrimAutoWhitespaceCandidates: { lineNumber: Int, oldContent: String }[] = []
-//
-//        for (let i = 0; i < operations.length; i++) {
-//            let op = operations[i]
-//            let reverseRange = reverseRanges[i]
-//
-//            if (recordTrimAutoWhitespace && op.isAutoWhitespaceEdit && op.range.isEmpty()) {
-//                // Record already the future line Ints that might be auto whitespace removal candidates on next edit
-//                for (let lineNumber = reverseRange.startLineNumber; lineNumber <= reverseRange.endLineNumber; lineNumber++) {
-//                    let currentLineContent = ''
-//                    if (lineNumber === reverseRange.startLineNumber) {
-//                        currentLineContent = getLineContent(op.range.startLineNumber)
-//                        if (Strings.firstNonWhitespaceIndex(currentLineContent) !== -1) {
-//                            continue
-//                        }
-//                    }
-//                    newTrimAutoWhitespaceCandidates.push({ lineNumber: lineNumber, oldContent: currentLineContent })
-//                }
-//            }
-//        }
-//
-//        let reverseOperations: IReverseSingleEditOperation[] = []
-//        for (let i = 0; i < operations.length; i++) {
-//            let op = operations[i]
-//            let reverseRange = reverseRanges[i]
-//
-//            reverseOperations[i] = {
-//                sortIndex: op.sortIndex,
-//                identifier: op.identifier,
-//                range: reverseRange,
-//                text: getValueInRange(op.range),
-//                forceMoveMarkers: op.forceMoveMarkers
-//            }
-//        }
-//
-//        // Can only sort reverse operations when the order is not significant
-//        if (!hasTouchingRanges) {
-//            reverseOperations.sort((a, b) => a.sortIndex - b.sortIndex)
-//        }
-//
-//        mightContainRTL = mightContainRTL
-//        mightContainNonBasicASCII = mightContainNonBasicASCII
-//
-//        const contentChanges = _doApplyEdits(operations)
-//
-//        let trimAutoWhitespacelineNumbers: Int[] | null = null
-//        if (recordTrimAutoWhitespace && newTrimAutoWhitespaceCandidates.length > 0) {
-//            // sort line Ints auto whitespace removal candidates for next edit descending
-//            newTrimAutoWhitespaceCandidates.sort((a, b) => b.lineNumber - a.lineNumber)
-//
-//            trimAutoWhitespacelineNumbers = []
-//            for (let i = 0, len = newTrimAutoWhitespaceCandidates.length; i < len; i++) {
-//                let lineNumber = newTrimAutoWhitespaceCandidates[i].lineNumber
-//                if (i > 0 && newTrimAutoWhitespaceCandidates[i - 1].lineNumber === lineNumber) {
-//                    // Do not have the same line Int twice
-//                    continue
-//                }
-//
-//                let prevContent = newTrimAutoWhitespaceCandidates[i].oldContent
-//                let lineContent = getLineContent(lineNumber)
-//
-//                if (lineContent.length === 0 || lineContent === prevContent || Strings.firstNonWhitespaceIndex(lineContent) !== -1) {
-//                    continue
-//                }
-//
-//                trimAutoWhitespacelineNumbers.push(lineNumber)
-//            }
-//        }
-//
-//        return new ApplyEditsResult(
-//            reverseOperations,
-//            contentChanges,
-//            trimAutoWhitespacelineNumbers
-//        )
+        // Delta encode operations
+        let reverseRanges = PieceTreeTextBuffer._getInverseEditRanges(operations)
+        var newTrimAutoWhitespaceCandidates: [(lineNumber: Int, oldContent: [UInt8])] = []
+
+        var i = 0
+        while i < operations.count {
+            let op = operations[i]
+            let reverseRange = reverseRanges[i]
+            i += 1
+            
+            if (recordTrimAutoWhitespace && op.isAutoWhitespaceEdit && op.range.isEmpty()) {
+                // Record already the future line Ints that might be auto whitespace removal candidates on next edit
+                for lineNumber in reverseRange.startLineNumber...reverseRange.endLineNumber {
+                    var currentLineContent : [UInt8] = []
+                    if (lineNumber == reverseRange.startLineNumber) {
+                        currentLineContent = getLineContent(lineNumber: op.range.startLineNumber)
+                        if Self.firstNonWhitespaceIndex(currentLineContent) != -1 {
+                            continue
+                        }
+                    }
+                    newTrimAutoWhitespaceCandidates.append((lineNumber: lineNumber, oldContent: currentLineContent))
+                }
+            }
+        }
+
+        var reverseOperations: [ReverseSingleEditOperation] = []
+        i = 0
+        while i < operations.count {
+            let op = operations[i]
+            let reverseRange = reverseRanges[i]
+
+            reverseOperations[i] = ReverseSingleEditOperation(
+                sortIndex: op.sortIndex,
+                identifier: op.identifier,
+                range: reverseRange,
+                text: getValueInRange(range: op.range),
+                forceMoveMarkers: op.forceMoveMarkers,
+                isAutoWhitespaceEdit: nil,
+                isTracked: false /* right value? */)
+            i += 1
+        }
+
+        // Can only sort reverse operations when the order is not significant
+        if !hasTouchingRanges {
+            reverseOperations.sort(by: { ($0.sortIndex - $1.sortIndex) < 0 })
+        }
+
+        self.mightContainRTL = mightContainRTL
+        self.mightContainNonBasicASCII = mightContainNonBasicASCII
+
+        let contentChanges = _doApplyEdits(operations: &operations)
+
+        var trimAutoWhitespacelineNumbers: [Int]? = nil
+        if recordTrimAutoWhitespace && newTrimAutoWhitespaceCandidates.count > 0 {
+            // sort line Ints auto whitespace removal candidates for next edit descending
+            newTrimAutoWhitespaceCandidates.sort(by: { ($1.lineNumber - $0.lineNumber) < 0})
+
+            trimAutoWhitespacelineNumbers = []
+            i = 0
+            let len = newTrimAutoWhitespaceCandidates.count
+            while i < len {
+                let lineNumber = newTrimAutoWhitespaceCandidates[i].lineNumber
+                i += 1
+                if i > 0 && newTrimAutoWhitespaceCandidates[i - 1].lineNumber == lineNumber {
+                    // Do not have the same line Int twice
+                    continue
+                }
+
+                let prevContent = newTrimAutoWhitespaceCandidates[i].oldContent
+                let lineContent = getLineContent(lineNumber: lineNumber)
+
+                if (lineContent.count == 0 || lineContent == prevContent || Self.firstNonWhitespaceIndex(lineContent) != -1) {
+                    continue
+                }
+
+                trimAutoWhitespacelineNumbers?.append(lineNumber)
+            }
+        }
+
+        return ApplyEditsResult (reverseEdits: reverseOperations, changes: contentChanges, trimAutoWhitespaceLineNumbers: trimAutoWhitespacelineNumbers)
     }
 
     /**
      * Transform operations such that they represent the same logic edit,
      * but that they also do not cause OOM crashes.
      */
-    func _reduceOperations(operations: [IValidatedEditOperation]) ->  [IValidatedEditOperation] {
+    func _reduceOperations(operations: [ValidatedEditOperation]) ->  [ValidatedEditOperation] {
         if operations.count < 1000 {
             // We know from empirical testing that a thousand edits work fine regardless of their shape.
             return operations
@@ -420,7 +432,7 @@ class PieceTreeTextBuffer {
         return [_toSingleEditOperation(operations)]
     }
 
-    func _toSingleEditOperation(_ operations: [IValidatedEditOperation]) -> IValidatedEditOperation
+    func _toSingleEditOperation(_ operations: [ValidatedEditOperation]) -> ValidatedEditOperation
     {
         var forceMoveMarkers = false
         let firstEditRange = operations[0].range
@@ -471,7 +483,7 @@ class PieceTreeTextBuffer {
 
         let llines = result.split(separator: 10, maxSplits: Int.max, omittingEmptySubsequences: false).map ({ Array ($0) })
         
-        return IValidatedEditOperation (sortIndex: 0,
+        return ValidatedEditOperation (sortIndex: 0,
                                         identifier: operations [0].identifier,
                                         range: entireEditRange,
                                         rangeOffset: getOffsetAt(lineNumber: entireEditRange.startLineNumber, column: entireEditRange.startColumn),
@@ -480,16 +492,8 @@ class PieceTreeTextBuffer {
                                         forceMoveMarkers: forceMoveMarkers,
                                         isAutoWhitespaceEdit: false)
     }
-
-    struct IInternalModelContentChange {
-        var range: Range
-        var rangeOffset: Int
-        var rangeLength: Int
-        var text: [UInt8]
-        var forceMoveMarkers: Bool
-    }
     
-    func _doApplyEdits(operations: inout [IValidatedEditOperation]) -> [IInternalModelContentChange]
+    func _doApplyEdits(operations: inout [ValidatedEditOperation]) -> [InternalModelContentChange]
     {
         operations.sort(by: { a, b in
             let r = Range.compareUsingEnds(a.range, b.range)
@@ -499,7 +503,7 @@ class PieceTreeTextBuffer {
             return r > 0
         })
 
-        var contentChanges: [IInternalModelContentChange] = []
+        var contentChanges: [InternalModelContentChange] = []
 
         // operations are from bottom to top
         for op in operations {
@@ -539,7 +543,7 @@ class PieceTreeTextBuffer {
             }
 
             let contentChangeRange = Range(startLineNumber: startLineNumber, startColumn: startColumn, endLineNumber: endLineNumber, endColumn: endColumn)
-            contentChanges.append(IInternalModelContentChange(
+            contentChanges.append(InternalModelContentChange(
                 range: contentChangeRange,
                 rangeOffset: op.rangeOffset,
                 rangeLength: op.rangeLength,
@@ -557,20 +561,21 @@ class PieceTreeTextBuffer {
 //
 //    // #endregion
 //
-//    // #region helper
-//    // testing purpose.
-//    public func getPieceTree() ->  PieceTreeBase {
-//        return pieceTree
-//    }
-//    
+    // #region helper
+    // testing purpose.
+    public func getPieceTree() ->  PieceTreeBase
+    {
+        return pieceTree
+    }
+    
     /**
      * Assumes `operations` are validated and sorted ascending
      */
-    public static func _getInverseEditRanges(operations: [IValidatedEditOperation]) ->  [Range] {
+    public static func _getInverseEditRanges(_ operations: [ValidatedEditOperation]) ->  [Range] {
         var result: [Range] = []
         var prevOpendLineNumber: Int = 0
         var prevOpEndColumn: Int = 0
-        var prevOpNil: IValidatedEditOperation? = nil
+        var prevOpNil: ValidatedEditOperation? = nil
         for op in operations {
             var startLineNumber: Int
             var startColumn: Int

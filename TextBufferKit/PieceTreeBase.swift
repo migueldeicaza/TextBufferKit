@@ -1589,7 +1589,7 @@ public class PieceTreeBase {
      *                    z
      */
     func rbInsertRight (_ node: TreeNode?, _ p: Piece) -> TreeNode {
-        var z = TreeNode(p, .red)
+        let z = TreeNode(p, .red)
         z.left = TreeNode.SENTINEL
         z.right = TreeNode.SENTINEL
         z.parent = TreeNode.SENTINEL
@@ -1622,7 +1622,7 @@ public class PieceTreeBase {
      *               z
      */
     func rbInsertLeft(node: TreeNode?, p: Piece) -> TreeNode {
-        var z = TreeNode(p, .red)
+        let z = TreeNode(p, .red)
         z.left = TreeNode.SENTINEL
         z.right = TreeNode.SENTINEL
         z.parent = TreeNode.SENTINEL
