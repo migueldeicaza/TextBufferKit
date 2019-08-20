@@ -14,7 +14,7 @@ class PieceTreeTextBufferTests: XCTestCase {
 //    const alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ\r\n';
 //
 //    function randomChar() {
-//        return alphabet[randomInt(alphabet.length)];
+//        return alphabet[randomInt(alphabet.count)];
 //    }
 //
 //    function randomInt(bound: number) {
@@ -39,59 +39,68 @@ class PieceTreeTextBufferTests: XCTestCase {
 //        })().join('');
 //    }
 //
-//    function trimLineFeed(text: string): string {
-//        if (text.length === 0) {
-//            return text;
-//        }
-//
-//        if (text.length === 1) {
-//            if (
-//                text.charCodeAt(text.length - 1) === 10 ||
-//                text.charCodeAt(text.length - 1) === 13
-//            ) {
-//                return '';
-//            }
-//            return text;
-//        }
-//
-//        if (text.charCodeAt(text.length - 1) === 10) {
-//            if (text.charCodeAt(text.length - 2) === 13) {
-//                return text.slice(0, -2);
-//            }
-//            return text.slice(0, -1);
-//        }
-//
-//        if (text.charCodeAt(text.length - 1) === 13) {
-//            return text.slice(0, -1);
-//        }
-//
-//        return text;
-//    }
-//
-//    //#region Assertion
-//
-//    func testLinesContent(_ str: String, pieceTable: PieceTreeBase)
-//    {
-//        let lines = str.split(/\r\n|\r|\n/);
-//        assert.equal(pieceTable.getLineCount(), lines.length);
-//        assert.equal(pieceTable.getLinesRawContent(), str);
-//        for (let i = 0; i < lines.length; i++) {
-//            assert.equal(pieceTable.getLineContent(i + 1), lines[i]);
-//            assert.equal(
-//                trimLineFeed(
-//                    pieceTable.getValueInRange(
-//                        new Range(
-//                            i + 1,
-//                            1,
-//                            i + 1,
-//                            lines[i].length + (i === lines.length - 1 ? 1 : 2)
-//                        )
-//                    )
-//                ),
-//                lines[i]
-//            );
-//        }
-//    }
+    func trimLineFeed(_ text: [UInt8]) -> [UInt8] {
+        let tc = text.count
+        if tc == 0 {
+            return text
+        }
+
+        if tc == 1 {
+            if (
+                text [tc - 1] == 10 ||
+                text [tc - 1] == 13
+            ) {
+                return []
+            }
+            return text
+        }
+
+        if text[tc - 1] == 10 {
+            if text [tc - 2] == 13 {
+                return Array (text [0..<(tc-2)])
+            }
+            return Array (text [0..<(tc-1)])
+        }
+
+        if text [tc - 1] == 13 {
+            return Array (text [0..<(tc-1)])
+        }
+
+        return text
+    }
+
+    //#region Assertion
+
+    let newlineChars = NSCharacterSet.newlines
+    
+    func splitStringNewlines (_ str: String) -> [String]
+    {
+        return str.components(separatedBy: newlineChars)
+    }
+    
+    func testLinesContent(_ str: String, pieceTable: PieceTreeBase)
+    {
+        let lines = splitStringNewlines(str)
+        
+        XCTAssertEqual(pieceTable.lineCount, lines.count)
+        XCTAssertEqual(pieceTable.getLinesRawContent(), toBytes (str))
+        for i in 0..<lines.count {
+            XCTAssertEqual(pieceTable.getLineContent(i + 1), toBytes (lines[i]))
+            XCTAssertEqual(
+                trimLineFeed(
+                    pieceTable.getValueInRange(
+                        range: Range.make (
+                            i + 1,
+                            1,
+                            i + 1,
+                            lines[i].count + (i == lines.count - 1 ? 1 : 2)
+                        )
+                    )
+                ),
+                toBytes (lines[i])
+            );
+        }
+    }
 //
 //    function testLineStarts(str: string, pieceTable: PieceTreeBase) {
 //        let lineStarts = [0];
@@ -104,7 +113,7 @@ class PieceTreeTextBufferTests: XCTestCase {
 //
 //        let m: RegExpExecArray | null;
 //        do {
-//            if (prevMatchStartIndex + prevMatchLength === str.length) {
+//            if (prevMatchStartIndex + prevMatchLength === str.count) {
 //                // Reached the end of the line
 //                break;
 //            }
@@ -115,7 +124,7 @@ class PieceTreeTextBufferTests: XCTestCase {
 //            }
 //
 //            const matchStartIndex = m.index;
-//            const matchLength = m[0].length;
+//            const matchLength = m[0].count;
 //
 //            if (
 //                matchStartIndex === prevMatchStartIndex &&
@@ -131,128 +140,141 @@ class PieceTreeTextBufferTests: XCTestCase {
 //            lineStarts.push(matchStartIndex + matchLength);
 //        } while (m);
 //
-//        for (let i = 0; i < lineStarts.length; i++) {
+//        for (let i = 0; i < lineStarts.count; i++) {
 //            assert.deepEqual(
 //                pieceTable.getPositionAt(lineStarts[i]),
 //                new Position(i + 1, 1)
 //            );
-//            assert.equal(pieceTable.getOffsetAt(i + 1, 1), lineStarts[i]);
+//            XCTAssertEqual(pieceTable.getOffsetAt(i + 1, 1), lineStarts[i]);
 //        }
 //
-//        for (let i = 1; i < lineStarts.length; i++) {
+//        for (let i = 1; i < lineStarts.count; i++) {
 //            let pos = pieceTable.getPositionAt(lineStarts[i] - 1);
-//            assert.equal(
+//            XCTAssertEqual(
 //                pieceTable.getOffsetAt(pos.lineNumber, pos.column),
 //                lineStarts[i] - 1
 //            );
 //        }
 //    }
 //
-//    function createTextBuffer(val: string[], normalizeEOL: boolean = true): PieceTreeBase {
-//        let bufferBuilder = new PieceTreeTextBufferBuilder();
-//        for (const chunk of val) {
-//            bufferBuilder.acceptChunk(chunk);
-//        }
-//        let factory = bufferBuilder.finish(normalizeEOL);
-//        return (<PieceTreeTextBuffer>factory.create(DefaultEndOfLine.LF)).getPieceTree();
-//    }
-//
-//    function assertTreeInvariants(T: PieceTreeBase): void {
-//        assert(SENTINEL.color === NodeColor.Black);
-//        assert(SENTINEL.parent === SENTINEL);
-//        assert(SENTINEL.left === SENTINEL);
-//        assert(SENTINEL.right === SENTINEL);
-//        assert(SENTINEL.size_left === 0);
-//        assert(SENTINEL.lf_left === 0);
-//        assertValidTree(T);
-//    }
-//
-//    function depth(n: TreeNode): number {
-//        if (n === SENTINEL) {
-//            // The leafs are black
-//            return 1;
-//        }
-//        assert(depth(n.left) === depth(n.right));
-//        return (n.color === NodeColor.Black ? 1 : 0) + depth(n.left);
-//    }
-//
-//    function assertValidNode(n: TreeNode): { size: number, lf_cnt: number } {
-//        if (n === SENTINEL) {
-//            return { size: 0, lf_cnt: 0 };
-//        }
-//
-//        let l = n.left;
-//        let r = n.right;
-//
-//        if (n.color === NodeColor.Red) {
-//            assert(l.color === NodeColor.Black);
-//            assert(r.color === NodeColor.Black);
-//        }
-//
-//        let actualLeft = assertValidNode(l);
-//        assert(actualLeft.lf_cnt === n.lf_left);
-//        assert(actualLeft.size === n.size_left);
-//        let actualRight = assertValidNode(r);
-//
-//        return { size: n.size_left + n.piece.length + actualRight.size, lf_cnt: n.lf_left + n.piece.lineFeedCnt + actualRight.lf_cnt };
-//    }
-//
-//    function assertValidTree(T: PieceTreeBase): void {
-//        if (T.root === SENTINEL) {
-//            return;
-//        }
-//        assert(T.root.color === NodeColor.Black);
-//        assert(depth(T.root.left) === depth(T.root.right));
-//        assertValidNode(T.root);
-//    }
-//
-//    //#endregion
-//
-//    suite('inserts and deletes', () => {
-//        test('basic insert/delete', () => {
-//            let pieceTable = createTextBuffer([
-//                'This is a document with some text.'
-//            ]);
-//
-//            pieceTable.insert(34, 'This is some more text to insert at offset 34.');
-//            assert.equal(
-//                pieceTable.getLinesRawContent(),
-//                'This is a document with some text.This is some more text to insert at offset 34.'
-//            );
-//            pieceTable.delete(42, 5);
-//            assert.equal(
-//                pieceTable.getLinesRawContent(),
-//                'This is a document with some text.This is more text to insert at offset 34.'
-//            );
-//            assertTreeInvariants(pieceTable);
-//        });
+    
+    func createTextBuffer(_ val: [String], _ normalizeEOL: Bool = true) -> PieceTreeBase
+    {
+        let bufferBuilder = PieceTreeTextBufferBuilder()
+        for chunk in val {
+            bufferBuilder.acceptChunk(chunk)
+        }
+        let factory = bufferBuilder.finish(normalizeEol: normalizeEOL)
+        return factory.create(.LF).getPieceTree()
+    }
+    
+
+    func assertTreeInvariants(_ T: PieceTreeBase)
+    {
+        XCTAssertTrue(TreeNode.SENTINEL.color == .black);
+        XCTAssertTrue(TreeNode.SENTINEL.parent === TreeNode.SENTINEL);
+        XCTAssertTrue(TreeNode.SENTINEL.left === TreeNode.SENTINEL);
+        XCTAssertTrue(TreeNode.SENTINEL.right === TreeNode.SENTINEL);
+        XCTAssertEqual(TreeNode.SENTINEL.size_left, 0);
+        XCTAssertEqual(TreeNode.SENTINEL.lf_left, 0);
+        assertValidTree(T);
+    }
+
+    func depth(_ n: TreeNode) ->  Int {
+        if (n === TreeNode.SENTINEL) {
+            // The leafs are black
+            return 1;
+        }
+        XCTAssertEqual(depth(n.left!), depth(n.right!));
+        return (n.color == .black ? 1 : 0) + depth(n.left!)
+    }
+
+    @discardableResult
+    func assertValidNode(_ n: TreeNode) ->  (size: Int, lf_cnt: Int) {
+        if (n === TreeNode.SENTINEL) {
+            return (size: 0, lf_cnt: 0)
+        }
+
+        XCTAssertNotNil(n.left)
+        XCTAssertNotNil(n.right)
+        let l = n.left!
+        let r = n.right!
+
+        if (n.color == .red) {
+            XCTAssertEqual(l.color, .black);
+            XCTAssertEqual(r.color, .black);
+        }
+
+        let actualLeft = assertValidNode(l)
+        XCTAssertEqual(actualLeft.lf_cnt, n.lf_left)
+        XCTAssertEqual(actualLeft.size, n.size_left);
+        let actualRight = assertValidNode(r)
+
+        return (size: n.size_left + n.piece.length + actualRight.size, lf_cnt: n.lf_left + n.piece.lineFeedCount + actualRight.lf_cnt )
+    }
+
+    func assertValidTree(_ T: PieceTreeBase)
+    {
+        if (T.root === TreeNode.SENTINEL) {
+            return
+        }
+        XCTAssertEqual(T.root.color, .black)
+        XCTAssertEqual(depth(T.root.left!), depth(T.root.right!))
+        assertValidNode (T.root)
+    }
+
+    func testInserts1 ()
+    {
+        let pt = createTextBuffer([""])
+
+        pt.insert(0, "AAA")
+        XCTAssertEqual(toStr (pt.getLinesRawContent()), "AAA")
+        pt.insert(0, "BBB")
+        XCTAssertEqual(toStr (pt.getLinesRawContent()), "BBBAAA")
+        pt.insert(6, "CCC")
+        XCTAssertEqual(toStr (pt.getLinesRawContent()), "BBBAAACCC")
+        pt.insert(5, "DDD")
+        XCTAssertEqual(toStr (pt.getLinesRawContent()), "BBBAADDDACCC")
+        assertTreeInvariants(pt)
+    }
+    
+    func testInsertsAndDeletes_basicInsertDelete ()
+    {
+            let pieceTable = createTextBuffer([
+                "This is a document with some text."
+            ])
+
+        pieceTable.insert(34, toBytes ("This is some more text to insert at offset 34."))
+        XCTAssertEqual(
+            toStr (pieceTable.getLinesRawContent()),
+            "This is a document with some text.This is some more text to insert at offset 34."
+        )
+        print (toStr (pieceTable.getLinesRawContent()))
+        assertTreeInvariants(pieceTable);
+        pieceTable.delete(offset: 42, cnt: 5)
+        assertTreeInvariants(pieceTable);
+        XCTAssertEqual(
+            toStr (pieceTable.getLinesRawContent()),
+            "This is a document with some text.This is more text to insert at offset 34."
+        );
+        assertTreeInvariants(pieceTable);
+    }
 //
 //        test('more inserts', () => {
-//            let pt = createTextBuffer(['']);
-//
-//            pt.insert(0, 'AAA');
-//            assert.equal(pt.getLinesRawContent(), 'AAA');
-//            pt.insert(0, 'BBB');
-//            assert.equal(pt.getLinesRawContent(), 'BBBAAA');
-//            pt.insert(6, 'CCC');
-//            assert.equal(pt.getLinesRawContent(), 'BBBAAACCC');
-//            pt.insert(5, 'DDD');
-//            assert.equal(pt.getLinesRawContent(), 'BBBAADDDACCC');
-//            assertTreeInvariants(pt);
 //        });
 //
 //        test('more deletes', () => {
 //            let pt = createTextBuffer(['012345678']);
 //            pt.delete(8, 1);
-//            assert.equal(pt.getLinesRawContent(), '01234567');
+//            XCTAssertEqual(pt.getLinesRawContent(), '01234567');
 //            pt.delete(0, 1);
-//            assert.equal(pt.getLinesRawContent(), '1234567');
+//            XCTAssertEqual(pt.getLinesRawContent(), '1234567');
 //            pt.delete(5, 1);
-//            assert.equal(pt.getLinesRawContent(), '123457');
+//            XCTAssertEqual(pt.getLinesRawContent(), '123457');
 //            pt.delete(5, 1);
-//            assert.equal(pt.getLinesRawContent(), '12345');
+//            XCTAssertEqual(pt.getLinesRawContent(), '12345');
 //            pt.delete(0, 5);
-//            assert.equal(pt.getLinesRawContent(), '');
+//            XCTAssertEqual(pt.getLinesRawContent(), '');
 //            assertTreeInvariants(pt);
 //        });
 //
@@ -261,17 +283,17 @@ class PieceTreeTextBufferTests: XCTestCase {
 //            let pieceTable = createTextBuffer(['']);
 //            pieceTable.insert(0, 'ceLPHmFzvCtFeHkCBej ');
 //            str = str.substring(0, 0) + 'ceLPHmFzvCtFeHkCBej ' + str.substring(0);
-//            assert.equal(pieceTable.getLinesRawContent(), str);
+//            XCTAssertEqual(pieceTable.getLinesRawContent(), str);
 //            pieceTable.insert(8, 'gDCEfNYiBUNkSwtvB K ');
 //            str = str.substring(0, 8) + 'gDCEfNYiBUNkSwtvB K ' + str.substring(8);
-//            assert.equal(pieceTable.getLinesRawContent(), str);
+//            XCTAssertEqual(pieceTable.getLinesRawContent(), str);
 //            pieceTable.insert(38, 'cyNcHxjNPPoehBJldLS ');
 //            str = str.substring(0, 38) + 'cyNcHxjNPPoehBJldLS ' + str.substring(38);
-//            assert.equal(pieceTable.getLinesRawContent(), str);
+//            XCTAssertEqual(pieceTable.getLinesRawContent(), str);
 //            pieceTable.insert(59, 'ejMx\nOTgWlbpeDExjOk ');
 //            str = str.substring(0, 59) + 'ejMx\nOTgWlbpeDExjOk ' + str.substring(59);
 //
-//            assert.equal(pieceTable.getLinesRawContent(), str);
+//            XCTAssertEqual(pieceTable.getLinesRawContent(), str);
 //            assertTreeInvariants(pieceTable);
 //        });
 //
@@ -289,7 +311,7 @@ class PieceTreeTextBufferTests: XCTestCase {
 //            pieceTable.insert(10, 'Gbtp ');
 //            str = str.substring(0, 10) + 'Gbtp ' + str.substring(10);
 //
-//            assert.equal(pieceTable.getLinesRawContent(), str);
+//            XCTAssertEqual(pieceTable.getLinesRawContent(), str);
 //            assertTreeInvariants(pieceTable);
 //        });
 //
@@ -306,7 +328,7 @@ class PieceTreeTextBufferTests: XCTestCase {
 //            str = str.substring(0, 2) + 'GGZB' + str.substring(2);
 //            pieceTable.insert(12, 'wXpq');
 //            str = str.substring(0, 12) + 'wXpq' + str.substring(12);
-//            assert.equal(pieceTable.getLinesRawContent(), str);
+//            XCTAssertEqual(pieceTable.getLinesRawContent(), str);
 //        });
 //
 //        test('random delete 1', () => {
@@ -315,30 +337,30 @@ class PieceTreeTextBufferTests: XCTestCase {
 //
 //            pieceTable.insert(0, 'vfb');
 //            str = str.substring(0, 0) + 'vfb' + str.substring(0);
-//            assert.equal(pieceTable.getLinesRawContent(), str);
+//            XCTAssertEqual(pieceTable.getLinesRawContent(), str);
 //            pieceTable.insert(0, 'zRq');
 //            str = str.substring(0, 0) + 'zRq' + str.substring(0);
-//            assert.equal(pieceTable.getLinesRawContent(), str);
+//            XCTAssertEqual(pieceTable.getLinesRawContent(), str);
 //
 //            pieceTable.delete(5, 1);
 //            str = str.substring(0, 5) + str.substring(5 + 1);
-//            assert.equal(pieceTable.getLinesRawContent(), str);
+//            XCTAssertEqual(pieceTable.getLinesRawContent(), str);
 //
 //            pieceTable.insert(1, 'UNw');
 //            str = str.substring(0, 1) + 'UNw' + str.substring(1);
-//            assert.equal(pieceTable.getLinesRawContent(), str);
+//            XCTAssertEqual(pieceTable.getLinesRawContent(), str);
 //
 //            pieceTable.delete(4, 3);
 //            str = str.substring(0, 4) + str.substring(4 + 3);
-//            assert.equal(pieceTable.getLinesRawContent(), str);
+//            XCTAssertEqual(pieceTable.getLinesRawContent(), str);
 //
 //            pieceTable.delete(1, 4);
 //            str = str.substring(0, 1) + str.substring(1 + 4);
-//            assert.equal(pieceTable.getLinesRawContent(), str);
+//            XCTAssertEqual(pieceTable.getLinesRawContent(), str);
 //
 //            pieceTable.delete(0, 1);
 //            str = str.substring(0, 0) + str.substring(0 + 1);
-//            assert.equal(pieceTable.getLinesRawContent(), str);
+//            XCTAssertEqual(pieceTable.getLinesRawContent(), str);
 //            assertTreeInvariants(pieceTable);
 //        });
 //
@@ -364,7 +386,7 @@ class PieceTreeTextBufferTests: XCTestCase {
 //            str = str.substring(0, 6) + str.substring(6 + 7);
 //            pieceTable.delete(3, 5);
 //            str = str.substring(0, 3) + str.substring(3 + 5);
-//            assert.equal(pieceTable.getLinesRawContent(), str);
+//            XCTAssertEqual(pieceTable.getLinesRawContent(), str);
 //            assertTreeInvariants(pieceTable);
 //        });
 //
@@ -397,7 +419,7 @@ class PieceTreeTextBufferTests: XCTestCase {
 //            str = str.substring(0, 5) + str.substring(5 + 8);
 //            pieceTable.delete(3, 4);
 //            str = str.substring(0, 3) + str.substring(3 + 4);
-//            assert.equal(pieceTable.getLinesRawContent(), str);
+//            XCTAssertEqual(pieceTable.getLinesRawContent(), str);
 //            assertTreeInvariants(pieceTable);
 //        });
 //
@@ -423,7 +445,7 @@ class PieceTreeTextBufferTests: XCTestCase {
 //            pieceTable.insert(5, '\n\na\r');
 //            str = str.substring(0, 5) + '\n\na\r' + str.substring(5);
 //
-//            assert.equal(pieceTable.getLinesRawContent(), str);
+//            XCTAssertEqual(pieceTable.getLinesRawContent(), str);
 //            assertTreeInvariants(pieceTable);
 //        });
 //
@@ -451,7 +473,7 @@ class PieceTreeTextBufferTests: XCTestCase {
 //            pieceTable.insert(2, 'a\ra\n');
 //            str = str.substring(0, 2) + 'a\ra\n' + str.substring(2);
 //
-//            assert.equal(pieceTable.getLinesRawContent(), str);
+//            XCTAssertEqual(pieceTable.getLinesRawContent(), str);
 //            assertTreeInvariants(pieceTable);
 //        });
 //
@@ -476,11 +498,11 @@ class PieceTreeTextBufferTests: XCTestCase {
 //            str = str.substring(0, 5) + '\n\na\r' + str.substring(5);
 //            pieceTable.insert(10, '\r\r\n\r');
 //            str = str.substring(0, 10) + '\r\r\n\r' + str.substring(10);
-//            assert.equal(pieceTable.getLinesRawContent(), str);
+//            XCTAssertEqual(pieceTable.getLinesRawContent(), str);
 //            pieceTable.delete(21, 3);
 //            str = str.substring(0, 21) + str.substring(21 + 3);
 //
-//            assert.equal(pieceTable.getLinesRawContent(), str);
+//            XCTAssertEqual(pieceTable.getLinesRawContent(), str);
 //            assertTreeInvariants(pieceTable);
 //        });
 //
@@ -508,7 +530,7 @@ class PieceTreeTextBufferTests: XCTestCase {
 //            pieceTable.insert(3, 'a\naa');
 //            str = str.substring(0, 3) + 'a\naa' + str.substring(3);
 //
-//            assert.equal(pieceTable.getLinesRawContent(), str);
+//            XCTAssertEqual(pieceTable.getLinesRawContent(), str);
 //            assertTreeInvariants(pieceTable);
 //        });
 //        test('random insert/delete \\r bug 5', () => {
@@ -535,7 +557,7 @@ class PieceTreeTextBufferTests: XCTestCase {
 //            pieceTable.insert(15, '\n\r\r\r');
 //            str = str.substring(0, 15) + '\n\r\r\r' + str.substring(15);
 //
-//            assert.equal(pieceTable.getLinesRawContent(), str);
+//            XCTAssertEqual(pieceTable.getLinesRawContent(), str);
 //            assertTreeInvariants(pieceTable);
 //        });
 //    });
@@ -544,7 +566,7 @@ class PieceTreeTextBufferTests: XCTestCase {
 //        test('basic', () => {
 //            let pieceTable = createTextBuffer(['1\n2\n3\n4']);
 //
-//            assert.equal(pieceTable.getLineCount(), 4);
+//            XCTAssertEqual(pieceTable.getLineCount(), 4);
 //            assert.deepEqual(pieceTable.getPositionAt(0), new Position(1, 1));
 //            assert.deepEqual(pieceTable.getPositionAt(1), new Position(1, 2));
 //            assert.deepEqual(pieceTable.getPositionAt(2), new Position(2, 1));
@@ -553,13 +575,13 @@ class PieceTreeTextBufferTests: XCTestCase {
 //            assert.deepEqual(pieceTable.getPositionAt(5), new Position(3, 2));
 //            assert.deepEqual(pieceTable.getPositionAt(6), new Position(4, 1));
 //
-//            assert.equal(pieceTable.getOffsetAt(1, 1), 0);
-//            assert.equal(pieceTable.getOffsetAt(1, 2), 1);
-//            assert.equal(pieceTable.getOffsetAt(2, 1), 2);
-//            assert.equal(pieceTable.getOffsetAt(2, 2), 3);
-//            assert.equal(pieceTable.getOffsetAt(3, 1), 4);
-//            assert.equal(pieceTable.getOffsetAt(3, 2), 5);
-//            assert.equal(pieceTable.getOffsetAt(4, 1), 6);
+//            XCTAssertEqual(pieceTable.getOffsetAt(1, 1), 0);
+//            XCTAssertEqual(pieceTable.getOffsetAt(1, 2), 1);
+//            XCTAssertEqual(pieceTable.getOffsetAt(2, 1), 2);
+//            XCTAssertEqual(pieceTable.getOffsetAt(2, 2), 3);
+//            XCTAssertEqual(pieceTable.getOffsetAt(3, 1), 4);
+//            XCTAssertEqual(pieceTable.getOffsetAt(3, 2), 5);
+//            XCTAssertEqual(pieceTable.getOffsetAt(4, 1), 6);
 //            assertTreeInvariants(pieceTable);
 //        });
 //
@@ -567,9 +589,9 @@ class PieceTreeTextBufferTests: XCTestCase {
 //            let pieceTable = createTextBuffer(['a\nb\nc\nde']);
 //            pieceTable.insert(8, 'fh\ni\njk');
 //
-//            assert.equal(pieceTable.getLineCount(), 6);
+//            XCTAssertEqual(pieceTable.getLineCount(), 6);
 //            assert.deepEqual(pieceTable.getPositionAt(9), new Position(4, 4));
-//            assert.equal(pieceTable.getOffsetAt(1, 1), 0);
+//            XCTAssertEqual(pieceTable.getOffsetAt(1, 1), 0);
 //            assertTreeInvariants(pieceTable);
 //        });
 //
@@ -577,7 +599,7 @@ class PieceTreeTextBufferTests: XCTestCase {
 //            let pieceTable = createTextBuffer(['a\nb\nc\nde']);
 //            pieceTable.insert(7, 'fh\ni\njk');
 //
-//            assert.equal(pieceTable.getLineCount(), 6);
+//            XCTAssertEqual(pieceTable.getLineCount(), 6);
 //            assert.deepEqual(pieceTable.getPositionAt(6), new Position(4, 1));
 //            assert.deepEqual(pieceTable.getPositionAt(7), new Position(4, 2));
 //            assert.deepEqual(pieceTable.getPositionAt(8), new Position(4, 3));
@@ -586,13 +608,13 @@ class PieceTreeTextBufferTests: XCTestCase {
 //            assert.deepEqual(pieceTable.getPositionAt(13), new Position(6, 2));
 //            assert.deepEqual(pieceTable.getPositionAt(14), new Position(6, 3));
 //
-//            assert.equal(pieceTable.getOffsetAt(4, 1), 6);
-//            assert.equal(pieceTable.getOffsetAt(4, 2), 7);
-//            assert.equal(pieceTable.getOffsetAt(4, 3), 8);
-//            assert.equal(pieceTable.getOffsetAt(4, 4), 9);
-//            assert.equal(pieceTable.getOffsetAt(6, 1), 12);
-//            assert.equal(pieceTable.getOffsetAt(6, 2), 13);
-//            assert.equal(pieceTable.getOffsetAt(6, 3), 14);
+//            XCTAssertEqual(pieceTable.getOffsetAt(4, 1), 6);
+//            XCTAssertEqual(pieceTable.getOffsetAt(4, 2), 7);
+//            XCTAssertEqual(pieceTable.getOffsetAt(4, 3), 8);
+//            XCTAssertEqual(pieceTable.getOffsetAt(4, 4), 9);
+//            XCTAssertEqual(pieceTable.getOffsetAt(6, 1), 12);
+//            XCTAssertEqual(pieceTable.getOffsetAt(6, 2), 13);
+//            XCTAssertEqual(pieceTable.getOffsetAt(6, 3), 14);
 //            assertTreeInvariants(pieceTable);
 //        });
 //
@@ -600,8 +622,8 @@ class PieceTreeTextBufferTests: XCTestCase {
 //            let pieceTable = createTextBuffer(['a\nb\nc\ndefh\ni\njk']);
 //            pieceTable.delete(7, 2);
 //
-//            assert.equal(pieceTable.getLinesRawContent(), 'a\nb\nc\ndh\ni\njk');
-//            assert.equal(pieceTable.getLineCount(), 6);
+//            XCTAssertEqual(pieceTable.getLinesRawContent(), 'a\nb\nc\ndh\ni\njk');
+//            XCTAssertEqual(pieceTable.getLineCount(), 6);
 //            assert.deepEqual(pieceTable.getPositionAt(6), new Position(4, 1));
 //            assert.deepEqual(pieceTable.getPositionAt(7), new Position(4, 2));
 //            assert.deepEqual(pieceTable.getPositionAt(8), new Position(4, 3));
@@ -610,13 +632,13 @@ class PieceTreeTextBufferTests: XCTestCase {
 //            assert.deepEqual(pieceTable.getPositionAt(12), new Position(6, 2));
 //            assert.deepEqual(pieceTable.getPositionAt(13), new Position(6, 3));
 //
-//            assert.equal(pieceTable.getOffsetAt(4, 1), 6);
-//            assert.equal(pieceTable.getOffsetAt(4, 2), 7);
-//            assert.equal(pieceTable.getOffsetAt(4, 3), 8);
-//            assert.equal(pieceTable.getOffsetAt(5, 1), 9);
-//            assert.equal(pieceTable.getOffsetAt(6, 1), 11);
-//            assert.equal(pieceTable.getOffsetAt(6, 2), 12);
-//            assert.equal(pieceTable.getOffsetAt(6, 3), 13);
+//            XCTAssertEqual(pieceTable.getOffsetAt(4, 1), 6);
+//            XCTAssertEqual(pieceTable.getOffsetAt(4, 2), 7);
+//            XCTAssertEqual(pieceTable.getOffsetAt(4, 3), 8);
+//            XCTAssertEqual(pieceTable.getOffsetAt(5, 1), 9);
+//            XCTAssertEqual(pieceTable.getOffsetAt(6, 1), 11);
+//            XCTAssertEqual(pieceTable.getOffsetAt(6, 2), 12);
+//            XCTAssertEqual(pieceTable.getOffsetAt(6, 3), 13);
 //            assertTreeInvariants(pieceTable);
 //        });
 //
@@ -625,8 +647,8 @@ class PieceTreeTextBufferTests: XCTestCase {
 //            pieceTable.insert(8, 'fh\ni\njk');
 //            pieceTable.delete(7, 2);
 //
-//            assert.equal(pieceTable.getLinesRawContent(), 'a\nb\nc\ndh\ni\njk');
-//            assert.equal(pieceTable.getLineCount(), 6);
+//            XCTAssertEqual(pieceTable.getLinesRawContent(), 'a\nb\nc\ndh\ni\njk');
+//            XCTAssertEqual(pieceTable.getLineCount(), 6);
 //            assert.deepEqual(pieceTable.getPositionAt(6), new Position(4, 1));
 //            assert.deepEqual(pieceTable.getPositionAt(7), new Position(4, 2));
 //            assert.deepEqual(pieceTable.getPositionAt(8), new Position(4, 3));
@@ -635,13 +657,13 @@ class PieceTreeTextBufferTests: XCTestCase {
 //            assert.deepEqual(pieceTable.getPositionAt(12), new Position(6, 2));
 //            assert.deepEqual(pieceTable.getPositionAt(13), new Position(6, 3));
 //
-//            assert.equal(pieceTable.getOffsetAt(4, 1), 6);
-//            assert.equal(pieceTable.getOffsetAt(4, 2), 7);
-//            assert.equal(pieceTable.getOffsetAt(4, 3), 8);
-//            assert.equal(pieceTable.getOffsetAt(5, 1), 9);
-//            assert.equal(pieceTable.getOffsetAt(6, 1), 11);
-//            assert.equal(pieceTable.getOffsetAt(6, 2), 12);
-//            assert.equal(pieceTable.getOffsetAt(6, 3), 13);
+//            XCTAssertEqual(pieceTable.getOffsetAt(4, 1), 6);
+//            XCTAssertEqual(pieceTable.getOffsetAt(4, 2), 7);
+//            XCTAssertEqual(pieceTable.getOffsetAt(4, 3), 8);
+//            XCTAssertEqual(pieceTable.getOffsetAt(5, 1), 9);
+//            XCTAssertEqual(pieceTable.getOffsetAt(6, 1), 11);
+//            XCTAssertEqual(pieceTable.getOffsetAt(6, 2), 12);
+//            XCTAssertEqual(pieceTable.getOffsetAt(6, 3), 13);
 //            assertTreeInvariants(pieceTable);
 //        });
 //
@@ -657,7 +679,7 @@ class PieceTreeTextBufferTests: XCTestCase {
 //            str =
 //                str.substring(0, 14) + 'X ZZ\nYZZYZXXY Y XY\n ' + str.substring(14);
 //
-//            assert.equal(pieceTable.getLinesRawContent(), str);
+//            XCTAssertEqual(pieceTable.getLinesRawContent(), str);
 //            testLineStarts(str, pieceTable);
 //            assertTreeInvariants(pieceTable);
 //        });
@@ -671,12 +693,12 @@ class PieceTreeTextBufferTests: XCTestCase {
 //            pieceTable.insert(3, 'XXY \n\nY Y YYY  ZYXY ');
 //            str = str.substring(0, 3) + 'XXY \n\nY Y YYY  ZYXY ' + str.substring(3);
 //
-//            assert.equal(pieceTable.getLinesRawContent(), str);
+//            XCTAssertEqual(pieceTable.getLinesRawContent(), str);
 //            testLineStarts(str, pieceTable);
 //            assertTreeInvariants(pieceTable);
 //        });
 //
-//        test('delete random bug 1: I forgot to update the lineFeedCnt when deletion is on one single piece.', () => {
+//        test('delete random bug 1: I forgot to update the lineFeedCount when deletion is on one single piece.', () => {
 //            let pieceTable = createTextBuffer(['']);
 //            pieceTable.insert(0, 'ba\na\nca\nba\ncbab\ncaa ');
 //            pieceTable.insert(13, 'cca\naabb\ncac\nccc\nab ');
@@ -799,12 +821,12 @@ class PieceTreeTextBufferTests: XCTestCase {
 //            pieceTable.delete(7, 2);
 //            // 'a\nb\nc\ndh\ni\njk'
 //
-//            assert.equal(pieceTable.getValueInRange(new Range(1, 1, 1, 3)), 'a\n');
-//            assert.equal(pieceTable.getValueInRange(new Range(2, 1, 2, 3)), 'b\n');
-//            assert.equal(pieceTable.getValueInRange(new Range(3, 1, 3, 3)), 'c\n');
-//            assert.equal(pieceTable.getValueInRange(new Range(4, 1, 4, 4)), 'dh\n');
-//            assert.equal(pieceTable.getValueInRange(new Range(5, 1, 5, 3)), 'i\n');
-//            assert.equal(pieceTable.getValueInRange(new Range(6, 1, 6, 3)), 'jk');
+//            XCTAssertEqual(pieceTable.getValueInRange(new Range(1, 1, 1, 3)), 'a\n');
+//            XCTAssertEqual(pieceTable.getValueInRange(new Range(2, 1, 2, 3)), 'b\n');
+//            XCTAssertEqual(pieceTable.getValueInRange(new Range(3, 1, 3, 3)), 'c\n');
+//            XCTAssertEqual(pieceTable.getValueInRange(new Range(4, 1, 4, 4)), 'dh\n');
+//            XCTAssertEqual(pieceTable.getValueInRange(new Range(5, 1, 5, 3)), 'i\n');
+//            XCTAssertEqual(pieceTable.getValueInRange(new Range(6, 1, 6, 3)), 'jk');
 //            assertTreeInvariants(pieceTable);
 //        });
 //
@@ -898,18 +920,18 @@ class PieceTreeTextBufferTests: XCTestCase {
 //
 //        test('get line content', () => {
 //            let pieceTable = createTextBuffer(['1']);
-//            assert.equal(pieceTable.getLineRawContent(1), '1');
+//            XCTAssertEqual(pieceTable.getLineRawContent(1), '1');
 //            pieceTable.insert(1, '2');
-//            assert.equal(pieceTable.getLineRawContent(1), '12');
+//            XCTAssertEqual(pieceTable.getLineRawContent(1), '12');
 //            assertTreeInvariants(pieceTable);
 //        });
 //
 //        test('get line content basic', () => {
 //            let pieceTable = createTextBuffer(['1\n2\n3\n4']);
-//            assert.equal(pieceTable.getLineRawContent(1), '1\n');
-//            assert.equal(pieceTable.getLineRawContent(2), '2\n');
-//            assert.equal(pieceTable.getLineRawContent(3), '3\n');
-//            assert.equal(pieceTable.getLineRawContent(4), '4');
+//            XCTAssertEqual(pieceTable.getLineRawContent(1), '1\n');
+//            XCTAssertEqual(pieceTable.getLineRawContent(2), '2\n');
+//            XCTAssertEqual(pieceTable.getLineRawContent(3), '3\n');
+//            XCTAssertEqual(pieceTable.getLineRawContent(4), '4');
 //            assertTreeInvariants(pieceTable);
 //        });
 //
@@ -919,12 +941,12 @@ class PieceTreeTextBufferTests: XCTestCase {
 //            pieceTable.delete(7, 2);
 //            // 'a\nb\nc\ndh\ni\njk'
 //
-//            assert.equal(pieceTable.getLineRawContent(1), 'a\n');
-//            assert.equal(pieceTable.getLineRawContent(2), 'b\n');
-//            assert.equal(pieceTable.getLineRawContent(3), 'c\n');
-//            assert.equal(pieceTable.getLineRawContent(4), 'dh\n');
-//            assert.equal(pieceTable.getLineRawContent(5), 'i\n');
-//            assert.equal(pieceTable.getLineRawContent(6), 'jk');
+//            XCTAssertEqual(pieceTable.getLineRawContent(1), 'a\n');
+//            XCTAssertEqual(pieceTable.getLineRawContent(2), 'b\n');
+//            XCTAssertEqual(pieceTable.getLineRawContent(3), 'c\n');
+//            XCTAssertEqual(pieceTable.getLineRawContent(4), 'dh\n');
+//            XCTAssertEqual(pieceTable.getLineRawContent(5), 'i\n');
+//            XCTAssertEqual(pieceTable.getLineRawContent(6), 'jk');
 //            assertTreeInvariants(pieceTable);
 //        });
 //
@@ -969,7 +991,7 @@ class PieceTreeTextBufferTests: XCTestCase {
 //            pieceTable.insert(0, 'a\r\nb');
 //            pieceTable.delete(0, 2);
 //
-//            assert.equal(pieceTable.getLineCount(), 2);
+//            XCTAssertEqual(pieceTable.getLineCount(), 2);
 //            assertTreeInvariants(pieceTable);
 //        });
 //
@@ -978,7 +1000,7 @@ class PieceTreeTextBufferTests: XCTestCase {
 //            pieceTable.insert(0, 'a\r\nb');
 //            pieceTable.delete(2, 2);
 //
-//            assert.equal(pieceTable.getLineCount(), 2);
+//            XCTAssertEqual(pieceTable.getLineCount(), 2);
 //            assertTreeInvariants(pieceTable);
 //        });
 //
@@ -995,7 +1017,7 @@ class PieceTreeTextBufferTests: XCTestCase {
 //            str = str.substring(0, 2) + str.substring(2 + 3);
 //
 //            let lines = str.split(/\r\n|\r|\n/);
-//            assert.equal(pieceTable.getLineCount(), lines.length);
+//            XCTAssertEqual(pieceTable.getLineCount(), lines.count);
 //            assertTreeInvariants(pieceTable);
 //        });
 //        test('random bug 2', () => {
@@ -1010,7 +1032,7 @@ class PieceTreeTextBufferTests: XCTestCase {
 //            str = str.substring(0, 4) + str.substring(4 + 1);
 //
 //            let lines = str.split(/\r\n|\r|\n/);
-//            assert.equal(pieceTable.getLineCount(), lines.length);
+//            XCTAssertEqual(pieceTable.getLineCount(), lines.count);
 //            assertTreeInvariants(pieceTable);
 //        });
 //        test('random bug 3', () => {
@@ -1031,7 +1053,7 @@ class PieceTreeTextBufferTests: XCTestCase {
 //            str = str.substring(0, 3) + '\r\r\r\n' + str.substring(3);
 //
 //            let lines = str.split(/\r\n|\r|\n/);
-//            assert.equal(pieceTable.getLineCount(), lines.length);
+//            XCTAssertEqual(pieceTable.getLineCount(), lines.count);
 //            assertTreeInvariants(pieceTable);
 //        });
 //        test('random bug 4', () => {
@@ -1181,14 +1203,14 @@ class PieceTreeTextBufferTests: XCTestCase {
 //        test('delete CR in CRLF 1', () => {
 //            let pieceTable = createTextBuffer(['a\r\nb'], false);
 //            pieceTable.delete(2, 2);
-//            assert.equal(pieceTable.getLineCount(), 2);
+//            XCTAssertEqual(pieceTable.getLineCount(), 2);
 //            assertTreeInvariants(pieceTable);
 //        });
 //        test('delete CR in CRLF 2', () => {
 //            let pieceTable = createTextBuffer(['a\r\nb']);
 //            pieceTable.delete(0, 2);
 //
-//            assert.equal(pieceTable.getLineCount(), 2);
+//            XCTAssertEqual(pieceTable.getLineCount(), 2);
 //            assertTreeInvariants(pieceTable);
 //        });
 //
@@ -1203,7 +1225,7 @@ class PieceTreeTextBufferTests: XCTestCase {
 //            str = str.substring(0, 2) + str.substring(2 + 3);
 //
 //            let lines = str.split(/\r\n|\r|\n/);
-//            assert.equal(pieceTable.getLineCount(), lines.length);
+//            XCTAssertEqual(pieceTable.getLineCount(), lines.count);
 //            assertTreeInvariants(pieceTable);
 //        });
 //        test('random bug 2', () => {
@@ -1216,7 +1238,7 @@ class PieceTreeTextBufferTests: XCTestCase {
 //            str = str.substring(0, 4) + str.substring(4 + 1);
 //
 //            let lines = str.split(/\r\n|\r|\n/);
-//            assert.equal(pieceTable.getLineCount(), lines.length);
+//            XCTAssertEqual(pieceTable.getLineCount(), lines.count);
 //            assertTreeInvariants(pieceTable);
 //        });
 //
@@ -1236,7 +1258,7 @@ class PieceTreeTextBufferTests: XCTestCase {
 //            str = str.substring(0, 3) + '\r\r\r\n' + str.substring(3);
 //
 //            let lines = str.split(/\r\n|\r|\n/);
-//            assert.equal(pieceTable.getLineCount(), lines.length);
+//            XCTAssertEqual(pieceTable.getLineCount(), lines.count);
 //            assertTreeInvariants(pieceTable);
 //        });
 //
@@ -1382,7 +1404,7 @@ class PieceTreeTextBufferTests: XCTestCase {
 //            pieceTable.insert(7, '\r\r\r\r');
 //            str = str.substring(0, 7) + '\r\r\r\r' + str.substring(7);
 //
-//            assert.equal(pieceTable.getLinesRawContent(), str);
+//            XCTAssertEqual(pieceTable.getLinesRawContent(), str);
 //            testLineStarts(str, pieceTable);
 //            assertTreeInvariants(pieceTable);
 //        });
@@ -1403,7 +1425,7 @@ class PieceTreeTextBufferTests: XCTestCase {
 //            pieceTable.delete(11, 2);
 //            str = str.substring(0, 11) + str.substring(11 + 2);
 //
-//            assert.equal(pieceTable.getLinesRawContent(), str);
+//            XCTAssertEqual(pieceTable.getLinesRawContent(), str);
 //            testLineStarts(str, pieceTable);
 //            assertTreeInvariants(pieceTable);
 //        });
@@ -1420,7 +1442,7 @@ class PieceTreeTextBufferTests: XCTestCase {
 //            pieceTable.delete(1, 2);
 //            str = str.substring(0, 1) + str.substring(1 + 2);
 //
-//            assert.equal(pieceTable.getLinesRawContent(), str);
+//            XCTAssertEqual(pieceTable.getLinesRawContent(), str);
 //            testLineStarts(str, pieceTable);
 //            assertTreeInvariants(pieceTable);
 //        });
@@ -1433,7 +1455,7 @@ class PieceTreeTextBufferTests: XCTestCase {
 //            pieceTable.insert(3, '\r\n\n\n');
 //            str = str.substring(0, 3) + '\r\n\n\n' + str.substring(3);
 //
-//            assert.equal(pieceTable.getLinesRawContent(), str);
+//            XCTAssertEqual(pieceTable.getLinesRawContent(), str);
 //            testLineStarts(str, pieceTable);
 //            assertTreeInvariants(pieceTable);
 //        });
@@ -1465,7 +1487,7 @@ class PieceTreeTextBufferTests: XCTestCase {
 //            pieceTable.insert(0, 'VZXXZYZX\r');
 //            str = str.substring(0, 0) + 'VZXXZYZX\r' + str.substring(0);
 //
-//            assert.equal(pieceTable.getLinesRawContent(), str);
+//            XCTAssertEqual(pieceTable.getLinesRawContent(), str);
 //
 //            testLineStarts(str, pieceTable);
 //            testLinesContent(str, pieceTable);
@@ -1482,16 +1504,16 @@ class PieceTreeTextBufferTests: XCTestCase {
 //                if (Math.random() < 0.6) {
 //                    // insert
 //                    let text = randomStr(100);
-//                    let pos = randomInt(str.length + 1);
+//                    let pos = randomInt(str.count + 1);
 //                    pieceTable.insert(pos, text);
 //                    str = str.substring(0, pos) + text + str.substring(pos);
 //                    // output += `pieceTable.insert(${pos}, '${text.replace(/\n/g, '\\n').replace(/\r/g, '\\r')}');\n`;
 //                    // output += `str = str.substring(0, ${pos}) + '${text.replace(/\n/g, '\\n').replace(/\r/g, '\\r')}' + str.substring(${pos});\n`;
 //                } else {
 //                    // delete
-//                    let pos = randomInt(str.length);
+//                    let pos = randomInt(str.count);
 //                    let length = Math.min(
-//                        str.length - pos,
+//                        str.count - pos,
 //                        Math.floor(Math.random() * 10)
 //                    );
 //                    pieceTable.delete(pos, length);
@@ -1503,7 +1525,7 @@ class PieceTreeTextBufferTests: XCTestCase {
 //            }
 //            // console.log(output);
 //
-//            assert.equal(pieceTable.getLinesRawContent(), str);
+//            XCTAssertEqual(pieceTable.getLinesRawContent(), str);
 //
 //            testLineStarts(str, pieceTable);
 //            testLinesContent(str, pieceTable);
@@ -1524,14 +1546,14 @@ class PieceTreeTextBufferTests: XCTestCase {
 //                if (Math.random() < 0.6) {
 //                    // insert
 //                    let text = randomStr(100);
-//                    let pos = randomInt(str.length + 1);
+//                    let pos = randomInt(str.count + 1);
 //                    pieceTable.insert(pos, text);
 //                    str = str.substring(0, pos) + text + str.substring(pos);
 //                } else {
 //                    // delete
-//                    let pos = randomInt(str.length);
+//                    let pos = randomInt(str.count);
 //                    let length = Math.min(
-//                        str.length - pos,
+//                        str.count - pos,
 //                        Math.floor(Math.random() * 10)
 //                    );
 //                    pieceTable.delete(pos, length);
@@ -1539,7 +1561,7 @@ class PieceTreeTextBufferTests: XCTestCase {
 //                }
 //            }
 //
-//            assert.equal(pieceTable.getLinesRawContent(), str);
+//            XCTAssertEqual(pieceTable.getLinesRawContent(), str);
 //            testLineStarts(str, pieceTable);
 //            testLinesContent(str, pieceTable);
 //            assertTreeInvariants(pieceTable);
@@ -1557,14 +1579,14 @@ class PieceTreeTextBufferTests: XCTestCase {
 //                if (Math.random() < 0.6) {
 //                    // insert
 //                    let text = randomStr(30);
-//                    let pos = randomInt(str.length + 1);
+//                    let pos = randomInt(str.count + 1);
 //                    pieceTable.insert(pos, text);
 //                    str = str.substring(0, pos) + text + str.substring(pos);
 //                } else {
 //                    // delete
-//                    let pos = randomInt(str.length);
+//                    let pos = randomInt(str.count);
 //                    let length = Math.min(
-//                        str.length - pos,
+//                        str.count - pos,
 //                        Math.floor(Math.random() * 10)
 //                    );
 //                    pieceTable.delete(pos, length);
@@ -1573,7 +1595,7 @@ class PieceTreeTextBufferTests: XCTestCase {
 //                testLinesContent(str, pieceTable);
 //            }
 //
-//            assert.equal(pieceTable.getLinesRawContent(), str);
+//            XCTAssertEqual(pieceTable.getLinesRawContent(), str);
 //            testLineStarts(str, pieceTable);
 //            testLinesContent(str, pieceTable);
 //            assertTreeInvariants(pieceTable);
@@ -1608,33 +1630,33 @@ class PieceTreeTextBufferTests: XCTestCase {
 //
 //        test('getLineCharCode - issue #45735', () => {
 //            let pieceTable = createTextBuffer(['LINE1\nline2']);
-//            assert.equal(pieceTable.getLineCharCode(1, 0), 'L'.charCodeAt(0), 'L');
-//            assert.equal(pieceTable.getLineCharCode(1, 1), 'I'.charCodeAt(0), 'I');
-//            assert.equal(pieceTable.getLineCharCode(1, 2), 'N'.charCodeAt(0), 'N');
-//            assert.equal(pieceTable.getLineCharCode(1, 3), 'E'.charCodeAt(0), 'E');
-//            assert.equal(pieceTable.getLineCharCode(1, 4), '1'.charCodeAt(0), '1');
-//            assert.equal(pieceTable.getLineCharCode(1, 5), '\n'.charCodeAt(0), '\\n');
-//            assert.equal(pieceTable.getLineCharCode(2, 0), 'l'.charCodeAt(0), 'l');
-//            assert.equal(pieceTable.getLineCharCode(2, 1), 'i'.charCodeAt(0), 'i');
-//            assert.equal(pieceTable.getLineCharCode(2, 2), 'n'.charCodeAt(0), 'n');
-//            assert.equal(pieceTable.getLineCharCode(2, 3), 'e'.charCodeAt(0), 'e');
-//            assert.equal(pieceTable.getLineCharCode(2, 4), '2'.charCodeAt(0), '2');
+//            XCTAssertEqual(pieceTable.getLineCharCode(1, 0), 'L'.charCodeAt(0), 'L');
+//            XCTAssertEqual(pieceTable.getLineCharCode(1, 1), 'I'.charCodeAt(0), 'I');
+//            XCTAssertEqual(pieceTable.getLineCharCode(1, 2), 'N'.charCodeAt(0), 'N');
+//            XCTAssertEqual(pieceTable.getLineCharCode(1, 3), 'E'.charCodeAt(0), 'E');
+//            XCTAssertEqual(pieceTable.getLineCharCode(1, 4), '1'.charCodeAt(0), '1');
+//            XCTAssertEqual(pieceTable.getLineCharCode(1, 5), '\n'.charCodeAt(0), '\\n');
+//            XCTAssertEqual(pieceTable.getLineCharCode(2, 0), 'l'.charCodeAt(0), 'l');
+//            XCTAssertEqual(pieceTable.getLineCharCode(2, 1), 'i'.charCodeAt(0), 'i');
+//            XCTAssertEqual(pieceTable.getLineCharCode(2, 2), 'n'.charCodeAt(0), 'n');
+//            XCTAssertEqual(pieceTable.getLineCharCode(2, 3), 'e'.charCodeAt(0), 'e');
+//            XCTAssertEqual(pieceTable.getLineCharCode(2, 4), '2'.charCodeAt(0), '2');
 //        });
 //
 //
 //        test('getLineCharCode - issue #47733', () => {
 //            let pieceTable = createTextBuffer(['', 'LINE1\n', 'line2']);
-//            assert.equal(pieceTable.getLineCharCode(1, 0), 'L'.charCodeAt(0), 'L');
-//            assert.equal(pieceTable.getLineCharCode(1, 1), 'I'.charCodeAt(0), 'I');
-//            assert.equal(pieceTable.getLineCharCode(1, 2), 'N'.charCodeAt(0), 'N');
-//            assert.equal(pieceTable.getLineCharCode(1, 3), 'E'.charCodeAt(0), 'E');
-//            assert.equal(pieceTable.getLineCharCode(1, 4), '1'.charCodeAt(0), '1');
-//            assert.equal(pieceTable.getLineCharCode(1, 5), '\n'.charCodeAt(0), '\\n');
-//            assert.equal(pieceTable.getLineCharCode(2, 0), 'l'.charCodeAt(0), 'l');
-//            assert.equal(pieceTable.getLineCharCode(2, 1), 'i'.charCodeAt(0), 'i');
-//            assert.equal(pieceTable.getLineCharCode(2, 2), 'n'.charCodeAt(0), 'n');
-//            assert.equal(pieceTable.getLineCharCode(2, 3), 'e'.charCodeAt(0), 'e');
-//            assert.equal(pieceTable.getLineCharCode(2, 4), '2'.charCodeAt(0), '2');
+//            XCTAssertEqual(pieceTable.getLineCharCode(1, 0), 'L'.charCodeAt(0), 'L');
+//            XCTAssertEqual(pieceTable.getLineCharCode(1, 1), 'I'.charCodeAt(0), 'I');
+//            XCTAssertEqual(pieceTable.getLineCharCode(1, 2), 'N'.charCodeAt(0), 'N');
+//            XCTAssertEqual(pieceTable.getLineCharCode(1, 3), 'E'.charCodeAt(0), 'E');
+//            XCTAssertEqual(pieceTable.getLineCharCode(1, 4), '1'.charCodeAt(0), '1');
+//            XCTAssertEqual(pieceTable.getLineCharCode(1, 5), '\n'.charCodeAt(0), '\\n');
+//            XCTAssertEqual(pieceTable.getLineCharCode(2, 0), 'l'.charCodeAt(0), 'l');
+//            XCTAssertEqual(pieceTable.getLineCharCode(2, 1), 'i'.charCodeAt(0), 'i');
+//            XCTAssertEqual(pieceTable.getLineCharCode(2, 2), 'n'.charCodeAt(0), 'n');
+//            XCTAssertEqual(pieceTable.getLineCharCode(2, 3), 'e'.charCodeAt(0), 'e');
+//            XCTAssertEqual(pieceTable.getLineCharCode(2, 4), '2'.charCodeAt(0), '2');
 //        });
 //    });
 //
@@ -1767,7 +1789,7 @@ class PieceTreeTextBufferTests: XCTestCase {
 //            ]);
 //            const snapshot = model.createSnapshot();
 //            const snapshot1 = model.createSnapshot();
-//            assert.equal(model.getLinesContent().join('\n'), getValueInSnapshot(snapshot));
+//            XCTAssertEqual(model.getLinesContent().join('\n'), getValueInSnapshot(snapshot));
 //
 //            model.applyEdits([
 //                {
@@ -1782,7 +1804,7 @@ class PieceTreeTextBufferTests: XCTestCase {
 //                }
 //            ]);
 //
-//            assert.equal(model.getLinesContent().join('\n'), getValueInSnapshot(snapshot1));
+//            XCTAssertEqual(model.getLinesContent().join('\n'), getValueInSnapshot(snapshot1));
 //        });
 //
 //        test('immutable snapshot 1', () => {
@@ -1802,7 +1824,7 @@ class PieceTreeTextBufferTests: XCTestCase {
 //                }
 //            ]);
 //
-//            assert.equal(model.getLinesContent().join('\n'), getValueInSnapshot(snapshot));
+//            XCTAssertEqual(model.getLinesContent().join('\n'), getValueInSnapshot(snapshot));
 //        });
 //
 //        test('immutable snapshot 2', () => {
@@ -1822,7 +1844,7 @@ class PieceTreeTextBufferTests: XCTestCase {
 //                }
 //            ]);
 //
-//            assert.equal(model.getLinesContent().join('\n'), getValueInSnapshot(snapshot));
+//            XCTAssertEqual(model.getLinesContent().join('\n'), getValueInSnapshot(snapshot));
 //        });
 //
 //        test('immutable snapshot 3', () => {
@@ -1850,7 +1872,7 @@ class PieceTreeTextBufferTests: XCTestCase {
 //            let pieceTree = createTextBuffer(['']);
 //            pieceTree.delete(0, 1);
 //            let ret = pieceTree.findMatchesLineByLine(new Range(1, 1, 1, 1), new SearchData(/abc/, new WordCharacterClassifier(',./'), 'abc'), true, 1000);
-//            assert.equal(ret.length, 0);
+//            XCTAssertEqual(ret.count, 0);
 //        });
 //
 //        test('#45770. FindInNode should not cross node boundary.', () => {
@@ -1869,7 +1891,7 @@ class PieceTreeTextBufferTests: XCTestCase {
 //
 //            pieceTree.insert(16, ' ');
 //            let ret = pieceTree.findMatchesLineByLine(new Range(1, 1, 4, 13), new SearchData(/\[/gi, new WordCharacterClassifier(',./'), '['), true, 1000);
-//            assert.equal(ret.length, 3);
+//            XCTAssertEqual(ret.count, 3);
 //
 //            assert.deepEqual(ret[0].range, new Range(2, 3, 2, 4));
 //            assert.deepEqual(ret[1].range, new Range(3, 3, 3, 4));
@@ -1885,12 +1907,12 @@ class PieceTreeTextBufferTests: XCTestCase {
 //            ]);
 //            pieceTree.delete(4, 1);
 //            let ret = pieceTree.findMatchesLineByLine(new Range(2, 3, 2, 6), new SearchData(/a/gi, null, 'a'), true, 1000);
-//            assert.equal(ret.length, 1);
+//            XCTAssertEqual(ret.count, 1);
 //            assert.deepEqual(ret[0].range, new Range(2, 3, 2, 4));
 //
 //            pieceTree.delete(4, 1);
 //            ret = pieceTree.findMatchesLineByLine(new Range(2, 2, 2, 5), new SearchData(/a/gi, null, 'a'), true, 1000);
-//            assert.equal(ret.length, 1);
+//            XCTAssertEqual(ret.count, 1);
 //            assert.deepEqual(ret[0].range, new Range(2, 2, 2, 3));
 //        });
 //    });

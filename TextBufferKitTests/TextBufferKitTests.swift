@@ -18,6 +18,21 @@ public func toBytes (_ str: String) -> [UInt8]
     return []
 }
 
+public func toBytes (_ strs: [String]) -> [[UInt8]]
+{
+    var result : [[UInt8]] = []
+    
+    for str in strs {
+        result.append (toBytes (str))
+    }
+    return result
+}
+
+public func toStr (_ arr: [UInt8]) -> String
+{
+    return String(bytes: arr, encoding: .utf8)!
+}
+
 class TextBufferKitTests: XCTestCase {
 
     override func setUp() {
@@ -37,12 +52,12 @@ class TextBufferKitTests: XCTestCase {
         builder.acceptChunk("abc\n")
         builder.acceptChunk("def")
         let factory = builder.finish(normalizeEol: true)
-        let pieceTree = factory.create(DefaultEndOfLine.LF)
+        let pieceTree = factory.create(DefaultEndOfLine.LF).getPieceTree()
 
         XCTAssertEqual(pieceTree.lineCount, 2)
         XCTAssertEqual(pieceTree.getLineContent (1), toBytes ("abc"))
         XCTAssertEqual(pieceTree.getLineContent(2), toBytes ("def"))
-        pieceTree.insert(offset: 1, value: [65])
+        pieceTree.insert(1, [65])
         
         XCTAssertEqual(pieceTree.lineCount, 2)
         XCTAssertEqual(pieceTree.getLineContent (1), toBytes ("aAbc"))

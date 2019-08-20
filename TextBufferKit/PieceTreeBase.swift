@@ -430,7 +430,7 @@ public class PieceTreeBase {
         return Position(line: 1, column: 1)
     }
 
-    public func getValueInRange(range: Range, eol _eol: [UInt8]?) -> [UInt8] {
+    public func getValueInRange(range: Range, eol _eol: [UInt8]? = nil) -> [UInt8] {
         if range.startLineNumber == range.endLineNumber && range.startColumn == range.endColumn {
             return []
         }
@@ -708,8 +708,12 @@ public class PieceTreeBase {
 //        return resultLen;
 //    }
 //
-
-    func insert(offset: Int, value _value: [UInt8], eolNormalized: Bool = false)
+    func insert(_ offset: Int, _ value: String, eolNormalized: Bool = false)
+    {
+        insert (offset, [UInt8](value.utf8))
+    }
+    
+    func insert(_ offset: Int, _ _value: [UInt8], eolNormalized: Bool = false)
     {
         var value = _value
         self.eolNormalized = self.eolNormalized && eolNormalized;

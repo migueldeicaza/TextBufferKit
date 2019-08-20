@@ -27,6 +27,12 @@ public struct Range {
         return a.endLineNumber - b.endLineNumber;
     }
     
+    /// Convenience method to not have to set all the parameter names
+    public static func make (_ startLine: Int, _ startColumn: Int, _ endLine: Int, _ endColumn: Int) -> Range
+    {
+        return Range(startLineNumber: startLine, startColumn: startColumn, endLineNumber: endLine, endColumn: endColumn)
+    }
+    
     /// Line number on which the range starts (starts at 1).
     public var startLineNumber: Int
     /// Column on which the range starts in line `startLineNumber` (starts at 1).

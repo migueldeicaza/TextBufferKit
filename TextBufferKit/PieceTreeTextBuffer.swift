@@ -8,7 +8,7 @@
 // https://github.com/microsoft/vscode/blob/master/src/vs/editor/common/model/pieceTreeTextBuffer/pieceTreeTextBuffer.ts
 import Foundation
 
-struct ValidatedEditOperation {
+public struct ValidatedEditOperation {
     var sortIndex: Int
     var identifier: SingleEditOperationIdentifier?
     var range: Range
@@ -84,7 +84,7 @@ public struct ApplyEditsResult {
     public var trimAutoWhitespaceLineNumbers: [Int]?
 }
 
-class PieceTreeTextBuffer {
+public class PieceTreeTextBuffer {
     var pieceTree: PieceTreeBase
     public private(set) var bom: [UInt8]
     public private(set) var mightContainRTL: Bool
@@ -177,7 +177,7 @@ class PieceTreeTextBuffer {
         return pieceTree.getLinesContent()
     }
 
-    public func getLineContent(lineNumber: Int) ->  [UInt8] {
+    public func getLineContent(_ lineNumber: Int) ->  [UInt8] {
         return pieceTree.getLineContent(lineNumber)
     }
 
@@ -212,7 +212,7 @@ class PieceTreeTextBuffer {
     }
     
     func getLineFirstNonWhitespaceColumn(lineNumber: Int) ->  Int {
-        let result = Self.firstNonWhitespaceIndex(getLineContent(lineNumber: lineNumber))
+        let result = Self.firstNonWhitespaceIndex(getLineContent(lineNumber))
         if result == -1 {
             return 0
         }
@@ -231,7 +231,7 @@ class PieceTreeTextBuffer {
     }
 
     public func getLineLastNonWhitespaceColumn(lineNumber: Int) ->  Int {
-        let result = Self.lastNonWhitespaceIndex(getLineContent(lineNumber: lineNumber))
+        let result = Self.lastNonWhitespaceIndex(getLineContent(lineNumber))
         if result == -1 {
             return 0
         }
@@ -347,7 +347,7 @@ class PieceTreeTextBuffer {
                 for lineNumber in reverseRange.startLineNumber...reverseRange.endLineNumber {
                     var currentLineContent : [UInt8] = []
                     if (lineNumber == reverseRange.startLineNumber) {
-                        currentLineContent = getLineContent(lineNumber: op.range.startLineNumber)
+                        currentLineContent = getLineContent(op.range.startLineNumber)
                         if Self.firstNonWhitespaceIndex(currentLineContent) != -1 {
                             continue
                         }
@@ -401,7 +401,7 @@ class PieceTreeTextBuffer {
                 }
 
                 let prevContent = newTrimAutoWhitespaceCandidates[i].oldContent
-                let lineContent = getLineContent(lineNumber: lineNumber)
+                let lineContent = getLineContent(lineNumber)
 
                 if (lineContent.count == 0 || lineContent == prevContent || Self.firstNonWhitespaceIndex(lineContent) != -1) {
                     continue
@@ -450,18 +450,18 @@ class PieceTreeTextBuffer {
             // (1) -- Push old text
             for lineNumber in lastendLineNumber..<range.startLineNumber {
                 if (lineNumber == lastendLineNumber) {
-                    result.append(contentsOf: getLineContent(lineNumber: lineNumber) [(lastEndColumn-1)...])
+                    result.append(contentsOf: getLineContent(lineNumber) [(lastEndColumn-1)...])
                 } else {
                     result.append (10)
-                    result.append(contentsOf: getLineContent(lineNumber: lineNumber))
+                    result.append(contentsOf: getLineContent(lineNumber))
                 }
             }
 
             if (range.startLineNumber == lastendLineNumber) {
-                result.append (contentsOf: getLineContent(lineNumber: range.startLineNumber) [(lastEndColumn - 1)..<(range.startColumn - 1)])
+                result.append (contentsOf: getLineContent(range.startLineNumber) [(lastEndColumn - 1)..<(range.startColumn - 1)])
             } else {
                 result.append (10)
-                result.append(contentsOf: getLineContent(lineNumber: range.startLineNumber) [0..<(range.startColumn - 1)])
+                result.append(contentsOf: getLineContent(range.startLineNumber) [0..<(range.startColumn - 1)])
             }
 
             // (2) -- Push new text
@@ -526,7 +526,7 @@ class PieceTreeTextBuffer {
             if text.count > 0 {
                 // replacement
                 pieceTree.delete(offset: op.rangeOffset, cnt: op.rangeLength)
-                pieceTree.insert(offset: op.rangeOffset, value: text, eolNormalized: true)
+                pieceTree.insert(op.rangeOffset, text, eolNormalized: true)
 
             } else {
                 // deletion
@@ -539,7 +539,7 @@ class PieceTreeTextBuffer {
                     newLinesContent.append (op.lines![j])
                 }
 
-                newLinesContent[newLinesContent.count - 1] = getLineContent(lineNumber: startLineNumber + insertingLinesCnt - 1)
+                newLinesContent[newLinesContent.count - 1] = getLineContent(startLineNumber + insertingLinesCnt - 1)
             }
 
             let contentChangeRange = Range(startLineNumber: startLineNumber, startColumn: startColumn, endLineNumber: endLineNumber, endColumn: endColumn)

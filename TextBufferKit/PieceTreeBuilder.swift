@@ -33,8 +33,10 @@ public class PieceTreeTextBufferFactory {
     var bom: [UInt8]
     var cr, lf, crlf: Int
     var normalizeEol: Bool
+    var containsRtl: Bool = false
+    var isBasicAscii: Bool = false
     
-    init(chunks : [StringBuffer], bom: [UInt8], cr : Int, lf: Int, crlf: Int, normalizeEol:Bool)
+    init(chunks : [StringBuffer], bom: [UInt8], cr : Int, lf: Int, crlf: Int, normalizeEol:Bool, containsRtl: Bool? = nil, isBasicAscii : Bool? = nil)
     {
         self.chunks = chunks
         self.bom = bom
@@ -42,6 +44,8 @@ public class PieceTreeTextBufferFactory {
         self.lf = lf
         self.crlf = crlf
         self.normalizeEol = normalizeEol
+        self.containsRtl = containsRtl ?? false
+        self.isBasicAscii = isBasicAscii ?? false
     }
     
     //
@@ -62,7 +66,7 @@ public class PieceTreeTextBufferFactory {
         return [10]
     }
 
-    public func create(_ defaultEOL: DefaultEndOfLine = .LF) -> PieceTreeBase
+    public func createPieceTreeBase (_ defaultEOL: DefaultEndOfLine = .LF) -> PieceTreeBase
     {
         let eol = getEOL(defaultEOL)
         var chunks = self.chunks
@@ -80,6 +84,26 @@ public class PieceTreeTextBufferFactory {
 
         return PieceTreeBase(chunks: &chunks, eol: eol, eolNormalized: normalizeEol)
     }
+
+    public func create (_ defaultEOL: DefaultEndOfLine = .LF) -> PieceTreeTextBuffer
+    {
+        let eol = getEOL(defaultEOL)
+        var chunks = self.chunks
+
+        if normalizeEol && ((eol == [13, 10] && (cr > 0 || lf > 0)) || (eol == [10] && (cr > 0 || crlf > 0))) {
+            // Normalize pieces
+            for i in 0..<chunks.count {
+                // TODO
+                // let str = chunks[i].buffer(/\r\n|\r|\n/g, eol);
+                let str = chunks [i].buffer
+                let newLineStart = LineStarts.createLineStartsArray(str)
+                chunks[i] = StringBuffer(buffer: str, lineStarts: newLineStart)
+            }
+        }
+
+        return PieceTreeTextBuffer(chunks: &chunks, BOM: bom, eol: eol, containsRTL: containsRtl, isBasicASCII: isBasicAscii, eolNormalized: normalizeEol)
+    }
+
 
     public func getFirstLineText(lengthLimit: Int) -> [UInt8] {
         return Array (chunks [0].buffer [0..<lengthLimit])
