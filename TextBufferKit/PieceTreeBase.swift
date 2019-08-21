@@ -439,7 +439,7 @@ public class PieceTreeBase {
             if let endPosition = nodeAt2(line: range.endLineNumber, col: range.endColumn) {
                 let value = getValueInRange2(startPosition, endPosition)
             
-                if let eol = _eol {
+                if _eol != nil {
                     // TODO
                     // if (eol !== self.eol || !eolNormalized) {
                     //
@@ -482,7 +482,7 @@ public class PieceTreeBase {
                 ret += Array (buffer [startOffset..<(startOffset + endPosition.remainder)])
                 break;
             } else {
-                ret += Array (buffer[startOffset..<x.piece.length])
+                ret += Array (buffer[startOffset..<(startOffset+x.piece.length)])
             }
 
             x = x.next()
@@ -910,7 +910,7 @@ public class PieceTreeBase {
             node.piece = nPiece
 
             value += [10 /*LF*/]
-            updateTreeMetadata (self, &node, -1, -1)
+            updateTreeMetadata (self, node, -1, -1)
 
             if node.piece.length == 0 {
                 nodesToDel.append(node)
@@ -919,8 +919,10 @@ public class PieceTreeBase {
 
         let newPieces = createNewPieces(value)
         var newNode = rbInsertLeft(node: node, p: newPieces[newPieces.count - 1])
-        for k in (0..<newPieces.count - 2).reversed () {
+        var k = newPieces.count - 2
+        while k >= 0 {
             newNode = rbInsertLeft(node: newNode, p: newPieces[k])
+            k -= 1
         }
         validateCRLFWithPrevNode(nextNode: &newNode)
         deleteNodes(nodesToDel)
@@ -1099,9 +1101,14 @@ public class PieceTreeBase {
         return [newPiece]
     }
     
-    func getLinesRawContent() -> [UInt8]
+    public func getLinesRawContent() -> [UInt8]
     {
         return getContentOfSubTree(node: root)
+    }
+    
+    public func getLines() -> String
+    {
+        return String(bytes: getLinesRawContent(), encoding: .utf8)!
     }
 
     func getLineRawContent(_ _lineNumber: Int, _ endOffset: Int = 0) -> [UInt8]
@@ -1163,7 +1170,7 @@ public class PieceTreeBase {
                 return ret
             } else {
                 let startOffset = offsetInBuffer(x.piece.bufferIndex, x.piece.start)
-                ret += Array (buffer [startOffset..<x.piece.length])
+                ret += Array (buffer [startOffset..<(startOffset+x.piece.length)])
             }
 
             x = x.next()
@@ -1236,7 +1243,7 @@ public class PieceTreeBase {
 
         node.piece = Piece(bufferIndex: piece.bufferIndex, start: piece.start, end: newEnd, length: newLength, lineFeedCount: newLineFeedCnt)
 
-        updateTreeMetadata(self, &node, size_delta, lf_delta)
+        updateTreeMetadata(self, node, size_delta, lf_delta)
     }
     
     func deleteNodeHead(node: inout TreeNode, pos: BufferCursor)
@@ -1253,7 +1260,7 @@ public class PieceTreeBase {
         let newLength = piece.length + size_delta
         node.piece = Piece(bufferIndex: piece.bufferIndex, start: newStart, end: piece.end, length: newLength, lineFeedCount: newLineFeedCnt)
 
-        updateTreeMetadata(self, &node, size_delta, lf_delta);
+        updateTreeMetadata(self, node, size_delta, lf_delta);
     }
     
     func shrinkNode(node: inout TreeNode, start: BufferCursor, end: BufferCursor)
@@ -1271,7 +1278,7 @@ public class PieceTreeBase {
 
         node.piece = Piece(bufferIndex: piece.bufferIndex, start: piece.start, end: newEnd, length: newLength, lineFeedCount: newLineFeedCnt)
 
-        updateTreeMetadata(self, &node, newLength - oldLength, newLineFeedCnt - oldLFCnt)
+        updateTreeMetadata(self, node, newLength - oldLength, newLineFeedCnt - oldLFCnt)
 
         // new right piece, end, originalEndPos
         let newPiece = Piece(bufferIndex: piece.bufferIndex, start: end, end: originalEndPos, length: offsetInBuffer(piece.bufferIndex, originalEndPos) - offsetInBuffer(piece.bufferIndex, end), lineFeedCount:getLineFeedCount(bufferIndex: piece.bufferIndex, start: end, end: originalEndPos))
@@ -1311,7 +1318,7 @@ public class PieceTreeBase {
 
         node.piece = Piece(bufferIndex: node.piece.bufferIndex, start: node.piece.start, end: newEnd, length: newLength, lineFeedCount: newLineFeedCount)
         lastChangeBufferPos = newEnd
-        updateTreeMetadata(self, &node, value.count, lf_delta)
+        updateTreeMetadata(self, node, value.count, lf_delta)
     }
     
     func nodeAt(_ _offset: Int) -> NodePosition?
@@ -1500,7 +1507,7 @@ public class PieceTreeBase {
         let prevNewLFCnt = prev.piece.lineFeedCount - 1
         prev.piece = Piece(bufferIndex: prev.piece.bufferIndex, start: prev.piece.start, end: newEnd, length: prevNewLength, lineFeedCount: prevNewLFCnt)
 
-        updateTreeMetadata(self, &prev, -1, -1);
+        updateTreeMetadata(self, prev, -1, -1);
         if (prev.piece.length == 0) {
             nodesToDel.append(prev)
         }
@@ -1511,7 +1518,7 @@ public class PieceTreeBase {
         let newLineFeedCnt = getLineFeedCount(bufferIndex: next.piece.bufferIndex, start: newStart, end: next.piece.end)
         next.piece = Piece(bufferIndex: next.piece.bufferIndex, start: newStart, end: next.piece.end, length: newLength, lineFeedCount: newLineFeedCnt)
 
-        updateTreeMetadata(self, &next, -1, -1)
+        updateTreeMetadata(self, next, -1, -1)
         if (next.piece.length == 0) {
             nodesToDel.append(next)
         }
@@ -1541,7 +1548,7 @@ public class PieceTreeBase {
                     let newLength = piece.length - 1
                     let newLineFeedCount = getLineFeedCount(bufferIndex: piece.bufferIndex, start: newStart, end: piece.end)
                     nextNode.piece = Piece(bufferIndex: piece.bufferIndex, start: newStart, end: piece.end, length: newLength, lineFeedCount: newLineFeedCount)
-                    updateTreeMetadata(self, &nextNode, -1, -1)
+                    updateTreeMetadata(self, nextNode, -1, -1)
                 }
                 return true
             }

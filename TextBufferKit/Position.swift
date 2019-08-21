@@ -8,7 +8,7 @@
 
 import Foundation
 
-public struct Position {
+public struct Position : Equatable {
     var line: Int
     var column: Int
     

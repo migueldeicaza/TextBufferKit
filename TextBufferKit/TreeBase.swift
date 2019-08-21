@@ -13,7 +13,7 @@ enum NodeColor {
     case red
 }
 
-public class TreeNode {
+public class TreeNode : CustomDebugStringConvertible {
     var parent: TreeNode?
     var left: TreeNode?
     var right: TreeNode?
@@ -38,6 +38,15 @@ public class TreeNode {
         
     }
 
+    public var debugDescription: String {
+        if self === TreeNode.SENTINEL {
+            return "SENTINEL"
+        }
+        let l = left === TreeNode.SENTINEL ? "(left:S)" : "(left)"
+        let r = right === TreeNode.SENTINEL ? "(right:S)" : "(right)"
+        return "Color \(color) size_left \(size_left) \(l) \(r)"
+    }
+    
     static var SENTINEL: TreeNode = TreeNode(Piece(bufferIndex: 0, start: BufferCursor(line: 0,column: 0), end: BufferCursor(line: 0, column: 0), length: 0, lineFeedCount: 0), .black);
     
     public func next() -> TreeNode {
@@ -264,7 +273,7 @@ func rbDelete(_ tree: PieceTreeBase, _ z: TreeNode) {
             let lf_delta = newLFLeft - x.parent!.lf_left
             x.parent!.size_left = newSizeLeft
             x.parent!.lf_left = newLFLeft
-            updateTreeMetadata(tree, &x.parent!, delta, lf_delta)
+            updateTreeMetadata(tree, x.parent!, delta, lf_delta)
         }
     }
 
@@ -385,7 +394,8 @@ func fixInsert(_ tree: PieceTreeBase,  _ _x: TreeNode) {
     tree.root.color = .black
 }
 
-func updateTreeMetadata(_ tree: PieceTreeBase, _ x: inout TreeNode, _ delta: Int, _ lineFeedCountDelta: Int) {
+func updateTreeMetadata(_ tree: PieceTreeBase, _ _x: TreeNode, _ delta: Int, _ lineFeedCountDelta: Int) {
+    var x = _x
     // node length change or line feed count change
     while (x !== tree.root && x !== TreeNode.SENTINEL) {
         if (x.parent!.left === x) {
