@@ -173,7 +173,7 @@ public class PieceTreeTextBuffer {
         return pieceTree.lineCount
     }
 
-    public func getLinesContent() -> [ArraySlice<UInt8>] {
+    public func getLinesContent() -> [[UInt8]] {
         return pieceTree.getLinesContent()
     }
 

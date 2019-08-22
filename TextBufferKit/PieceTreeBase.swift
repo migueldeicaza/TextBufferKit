@@ -277,9 +277,13 @@ public class PieceTreeBase {
     var buffers: [StringBuffer] = [StringBuffer (buffer: [], lineStarts: [])]
     public private(set) var lineCount : Int = 1
     public private(set) var length: Int = 0
-    public var eol: [UInt8] = [10] {
-        didSet {
-            eolLength = eol.count
+    var _eol: [UInt8] = [10]
+    public var eol: [UInt8] {
+        get {
+            return _eol
+        }
+        set {
+            _eol = newValue
             normalizeEol()
         }
     }
@@ -302,7 +306,7 @@ public class PieceTreeBase {
         buffers = [StringBuffer(buffer: [], lineStarts: [0])]
         lineCount = 1
         length = 0
-        self.eol = eol
+        self._eol = eol
         eolLength = eol.count
         self.eolNormalized = eolNormalized
         
@@ -330,9 +334,64 @@ public class PieceTreeBase {
         computeBufferMetadata()
     }
     
+    // Replaces \r\n, \r and \n with the value of eol
+    func replaceNewLines (_ val: [UInt8]) -> [UInt8]
+    {
+        var result : [UInt8] = []
+        let len = val.count
+        var i = 0
+        while i < len {
+            let v = val [i]
+            if v == 13 {
+                if i+1 < len && val [i+1] == 10 {
+                    result.append (contentsOf: eol)
+                    i += 1
+                } else {
+                    result.append (contentsOf: eol)
+                }
+            } else if v == 10 {
+                result.append (contentsOf: eol)
+            } else {
+                result.append (val [i])
+            }
+            i += 1
+        }
+        return result
+    }
+    
     func normalizeEol ()
     {
-        // TODO
+        let averageBufferSize = AverageBufferSize
+        let min = Int (Float (averageBufferSize) - floor(Float (averageBufferSize / 3)))
+        let max = min * 2
+
+        var tempChunk : [UInt8] = []
+        var tempChunkLen = 0
+        var chunks: [StringBuffer] = []
+
+        iterate(node: root, callback: { node in
+            let str = getNodeContent(node)
+            let len = str.count
+            if (tempChunkLen <= min || tempChunkLen + len < max) {
+                tempChunk += str
+                tempChunkLen += len
+                return true
+            }
+
+            // flush anyways
+            let text = replaceNewLines (tempChunk)
+            chunks.append(StringBuffer(buffer: text, lineStarts: LineStarts.createLineStartsArray(text)))
+            tempChunk = str
+            tempChunkLen = len
+            return true
+        })
+
+        if (tempChunkLen > 0) {
+            let text = replaceNewLines (tempChunk)
+            chunks.append (StringBuffer(buffer: text, lineStarts: LineStarts.createLineStartsArray(text)))
+        }
+
+        create(chunks: &chunks, eol: eol, eolNormalized: true)
     }
     
     public func createSnapshot(bom: [UInt8]) -> PieceTreeSnapshot {
@@ -440,19 +499,18 @@ public class PieceTreeBase {
                 let value = getValueInRange2(startPosition, endPosition)
             
                 if _eol != nil {
-                    // TODO
-                    // if (eol !== self.eol || !eolNormalized) {
-                    //
-                    //     return value.replace(/\r\n|\r|\n/g, eol);
-                    // }
-                    //
-                    // if (eol === getEOL() && _EOLNormalized) {
-                    //     if (eol === '\r\n') {
-                    //
-                    //     }
-                    //     return value;
-                    // }
-                    // return value.replace(/\r\n|\r|\n/g, eol);
+                     if (eol != self.eol || !eolNormalized) {
+                    
+                         return replaceNewLines(value)
+                     }
+                    
+                    if (eol == self.eol && eolNormalized) {
+                         if (eol == [13, 10]) {
+                    
+                         }
+                         return value;
+                     }
+                     return replaceNewLines (value)
                 }
                 return value
             }
@@ -491,12 +549,40 @@ public class PieceTreeBase {
         return ret
     }
     
-    public func getLinesContent() -> [ArraySlice <UInt8>]
+    /// Splits a buffer containing the whole text in lines,
+    /// where lines are those with \r\n, \r or \n
+    public static func splitBufferInLines (_ contents: [UInt8]) -> [[UInt8]]
     {
-        // TODO
-        // return getContentOfSubTree(root).split(/\r\n|\r|\n/);
+        var result : [[UInt8]] = []
+        var i = 0
+        var line : [UInt8] = []
         
-        return Array (getContentOfSubTree(node: root).split(separator: 10 /* LF */))
+        let top = contents.count
+        while i < top {
+            let c = contents [i]
+            if c == 13 {
+                if i+1 < top && contents [i+1] == 10 {
+                    i += 1
+                }
+                result.append (line)
+                line = []
+            } else if c == 10 {
+                result.append (line)
+                line = []
+            } else {
+                line.append (c)
+            }
+            i += 1
+        }
+        if line.count > 0 {
+            result.append (line)
+        }
+        return result
+    }
+    
+    public func getLinesContent() -> [[UInt8]]
+    {
+        return Self.splitBufferInLines (getContentOfSubTree(node: root))
     }
     
     
@@ -514,8 +600,8 @@ public class PieceTreeBase {
         } else {
             var l = getLineRawContent(lineNumber)
             let len = l.count
-            if len > 1 {
-                if len > 2 && l [len-2] == 13 && l [len-1] == 10 {
+            if len >= 1 {
+                if len >= 2 && l [len-2] == 13 && l [len-1] == 10 {
                     l.removeLast(2)
                 } else if l [len-1] == 10 || l [len-1] == 13 {
                     l.removeLast()
@@ -1535,7 +1621,7 @@ public class PieceTreeBase {
     
     func adjustCarriageReturnFromNext(value: inout [UInt8], node: TreeNode) -> Bool {
         if shouldCheckCRLF() && endWithCR(value) {
-            var nextNode = node.next()
+            let nextNode = node.next()
             if startWithLF(nextNode) {
                 // move `\n` forward
                 value += [10 /*LF*/]

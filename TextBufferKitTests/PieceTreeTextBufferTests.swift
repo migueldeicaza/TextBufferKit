@@ -5,16 +5,31 @@
 //  Created by Miguel de Icaza on 8/19/19.
 //  Copyright © 2019 Miguel de Icaza. All rights reserved.
 //
+// Well, Swift does not really deal well with "\r\n", "\r" and "\n" injected into
+// the stream, in a few places concatenating those strings become no-ops, like:
+// var str = "\r\r\n\r\r\n\n\n\r\r\n\n\r\n\r\n\r\r\r"
+// str = str.substring(0, 15) + "\n\r\r\r" + str.substring(15)
+// After this, "str" will have the same value as before.
+//
+// Tests prefixed with BYTES_ need to be rewritten with the byte api, to avoid
+// Swift's curious string handling with \r \n
+//
 import XCTest
 import Foundation
 @testable import TextBufferKit
 
 extension String {
+
     func substring (_ start: Int, _ end: Int) -> String
     {
-        let startIndex = self.index(self.startIndex, offsetBy: start)
-        let endIndex = self.index(self.startIndex, offsetBy: end)
-        return String(self[startIndex..<endIndex])
+        //
+        // This is coded this way, because the documented:
+        // let sidx = str.index (str.startIndex, offsetBy: start)
+        // let eix = str.index (str.startIndex, offsetBy: end)
+        // let result = self[sidx..<eidx] produces the expected [sidx,eidx) range for strings
+        // but produces [sidx,eidx] range when the string contains "\r\r\n\n"
+        let j = toBytes (self)
+        return toStr (Array (j [start..<end]))
     }
 
     func substring (_ start: Int) -> String
@@ -22,12 +37,16 @@ extension String {
         if start > self.count {
             return ""
         }
-        return String (self [self.index(self.startIndex, offsetBy: start)...])
+        // This used to be coded like this:
+        // return String (self [self.index(self.startIndex, offsetBy: start)...])
+        // But swift decided that for the string "\r\r\n", the substring(2) is not "\n" but ""
+        let j = toBytes (self)
+        return toStr (Array (j [start...]))
     }
 }
 class PieceTreeTextBufferTests: XCTestCase {
 
-    let alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ" // "\r\n"
+    let alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ\r\n"
 
     func randomChar() -> Character {
         return Array (alphabet)[Int.random (in: 0..<alphabet.count)]
@@ -76,17 +95,26 @@ class PieceTreeTextBufferTests: XCTestCase {
 
     //#region Assertion
 
-    let newlineChars = NSCharacterSet.newlines
-    
+    // This splits using the rules of TextBuffer, which considers
+    // \r\n, \r or \n a line separator.   The first instance is a single
+    // line separator, not two.
     func splitStringNewlines (_ str: String) -> [String]
     {
-        return str.components(separatedBy: newlineChars)
+        let lines = PieceTreeBase.splitBufferInLines (toBytes (str))
+        var result : [String] = []
+        for x in lines {
+            result.append (toStr (x))
+        }
+        return result
     }
     
     func testLinesContent(_ str: String, _ pieceTable: PieceTreeBase)
     {
         let lines = splitStringNewlines(str)
         
+        if pieceTable.lineCount != lines.count {
+            _ = 1
+        }
         XCTAssertEqual(pieceTable.lineCount, lines.count)
         XCTAssertEqual(pieceTable.getLines(), str)
         for i in 0..<lines.count {
@@ -425,146 +453,193 @@ class PieceTreeTextBufferTests: XCTestCase {
         assertTreeInvariants(pieceTable)
     }
 
-    func NOT_YET_testRandomInsertDeleteBug1 ()
+    func testRandomInsertDeleteBug1 ()
     {
         var str = "a"
         let pieceTable = createTextBuffer(["a"])
+        
         pieceTable.delete(offset: 0, cnt: 1)
         str = str.substring(0, 0) + str.substring(0 + 1)
+        XCTAssertEqual(pieceTable.getLines(), str)
+        
         pieceTable.insert(0, "\r\r\n\n")
         str = str.substring(0, 0) + "\r\r\n\n" + str.substring(0)
+        XCTAssertEqual(pieceTable.getLines(), str)
+        
         pieceTable.delete(offset: 3, cnt: 1)
         str = str.substring(0, 3) + str.substring(3 + 1)
+        XCTAssertEqual(pieceTable.getLines(), str)
+        
         pieceTable.insert(2, "\n\n\ra")
         str = str.substring(0, 2) + "\n\n\ra" + str.substring(2)
+        XCTAssertEqual(pieceTable.getLines(), str)
+        
         pieceTable.delete(offset: 4, cnt: 3)
         str = str.substring(0, 4) + str.substring(4 + 3)
+        XCTAssertEqual(pieceTable.getLines(), str)
+        
         pieceTable.insert(2, "\na\r\r")
         str = str.substring(0, 2) + "\na\r\r" + str.substring(2)
+        XCTAssertEqual(pieceTable.getLines(), str)
         pieceTable.insert(6, "\ra\n\n")
         str = str.substring(0, 6) + "\ra\n\n" + str.substring(6)
+        XCTAssertEqual(pieceTable.getLines(), str)
+        
         pieceTable.insert(0, "aa\n\n")
         str = str.substring(0, 0) + "aa\n\n" + str.substring(0)
+        XCTAssertEqual(pieceTable.getLines(), str)
+        
         pieceTable.insert(5, "\n\na\r")
         str = str.substring(0, 5) + "\n\na\r" + str.substring(5)
+        let lines = pieceTable.getLines()
+        
+        // If I inline "pieceTable.getLines" below, the result breaks!
+        XCTAssertEqual(lines, str)
+        
+        assertTreeInvariants(pieceTable)
+    }
+    
+    func testRandomInsertDeleteBug2 ()
+    {
+        //test("random insert/delete \\r bug 2", () => {
+        var str = "a"
+        let pieceTable = createTextBuffer(["a"])
+        pieceTable.insert(1, "\naa\r")
+        str = str.substring(0, 1) + "\naa\r" + str.substring(1)
+        pieceTable.delete(offset: 0, cnt: 4)
+        str = str.substring(0, 0) + str.substring(0 + 4)
+        pieceTable.insert(1, "\r\r\na")
+        str = str.substring(0, 1) + "\r\r\na" + str.substring(1)
+        pieceTable.insert(2, "\n\r\ra")
+        str = str.substring(0, 2) + "\n\r\ra" + str.substring(2)
+        pieceTable.delete(offset: 4, cnt: 1)
+        str = str.substring(0, 4) + str.substring(4 + 1)
+        pieceTable.insert(8, "\r\n\r\r")
+        str = str.substring(0, 8) + "\r\n\r\r" + str.substring(8)
+        pieceTable.insert(7, "\n\n\na")
+        str = str.substring(0, 7) + "\n\n\na" + str.substring(7)
+        pieceTable.insert(13, "a\n\na")
+        str = str.substring(0, 13) + "a\n\na" + str.substring(13)
+        pieceTable.delete(offset: 17, cnt: 3)
+        str = str.substring(0, 17) + str.substring(17 + 3)
+        pieceTable.insert(2, "a\ra\n")
+        str = str.substring(0, 2) + "a\ra\n" + str.substring(2)
+
+        XCTAssertEqual(pieceTable.getLines(), str)
+        assertTreeInvariants(pieceTable)
+    }
+
+    func testRandomInsertDeleteBug3 ()
+    {
+        // test("random insert/delete \\r bug 3", () => {
+        var str = "a"
+        let pieceTable = createTextBuffer(["a"])
+        pieceTable.insert(0, "\r\na\r")
+        str = str.substring(0, 0) + "\r\na\r" + str.substring(0)
+        pieceTable.delete(offset: 2, cnt: 3)
+        str = str.substring(0, 2) + str.substring(2 + 3)
+        pieceTable.insert(2, "a\r\n\r")
+        str = str.substring(0, 2) + "a\r\n\r" + str.substring(2)
+        pieceTable.delete(offset: 4, cnt: 2)
+        str = str.substring(0, 4) + str.substring(4 + 2)
+        pieceTable.insert(4, "a\n\r\n")
+        str = str.substring(0, 4) + "a\n\r\n" + str.substring(4)
+        pieceTable.insert(1, "aa\n\r")
+        str = str.substring(0, 1) + "aa\n\r" + str.substring(1)
+        pieceTable.insert(7, "\na\r\n")
+        str = str.substring(0, 7) + "\na\r\n" + str.substring(7)
+        pieceTable.insert(5, "\n\na\r")
+        str = str.substring(0, 5) + "\n\na\r" + str.substring(5)
+        pieceTable.insert(10, "\r\r\n\r")
+        str = str.substring(0, 10) + "\r\r\n\r" + str.substring(10)
+        XCTAssertEqual(pieceTable.getLines(), str)
+        pieceTable.delete(offset: 21, cnt: 3)
+        str = str.substring(0, 21) + str.substring(21 + 3)
 
         XCTAssertEqual(pieceTable.getLines(), str)
         assertTreeInvariants(pieceTable)
     }
     
-//        test("random insert/delete \\r bug 2", () => {
-//            let str = "a"
-//            let pieceTable = createTextBuffer(["a"])
-//            pieceTable.insert(1, "\naa\r")
-//            str = str.substring(0, 1) + "\naa\r" + str.substring(1)
-//            pieceTable.delete(0, 4)
-//            str = str.substring(0, 0) + str.substring(0 + 4)
-//            pieceTable.insert(1, "\r\r\na")
-//            str = str.substring(0, 1) + "\r\r\na" + str.substring(1)
-//            pieceTable.insert(2, "\n\r\ra")
-//            str = str.substring(0, 2) + "\n\r\ra" + str.substring(2)
-//            pieceTable.delete(4, 1)
-//            str = str.substring(0, 4) + str.substring(4 + 1)
-//            pieceTable.insert(8, "\r\n\r\r")
-//            str = str.substring(0, 8) + "\r\n\r\r" + str.substring(8)
-//            pieceTable.insert(7, "\n\n\na")
-//            str = str.substring(0, 7) + "\n\n\na" + str.substring(7)
-//            pieceTable.insert(13, "a\n\na")
-//            str = str.substring(0, 13) + "a\n\na" + str.substring(13)
-//            pieceTable.delete(17, 3)
-//            str = str.substring(0, 17) + str.substring(17 + 3)
-//            pieceTable.insert(2, "a\ra\n")
-//            str = str.substring(0, 2) + "a\ra\n" + str.substring(2)
-//
-//            XCTAssertEqual(pieceTable.getLines(), str)
-//            assertTreeInvariants(pieceTable)
-//        })
-//
-//        test("random insert/delete \\r bug 3", () => {
-//            let str = "a"
-//            let pieceTable = createTextBuffer(["a"])
-//            pieceTable.insert(0, "\r\na\r")
-//            str = str.substring(0, 0) + "\r\na\r" + str.substring(0)
-//            pieceTable.delete(2, 3)
-//            str = str.substring(0, 2) + str.substring(2 + 3)
-//            pieceTable.insert(2, "a\r\n\r")
-//            str = str.substring(0, 2) + "a\r\n\r" + str.substring(2)
-//            pieceTable.delete(4, 2)
-//            str = str.substring(0, 4) + str.substring(4 + 2)
-//            pieceTable.insert(4, "a\n\r\n")
-//            str = str.substring(0, 4) + "a\n\r\n" + str.substring(4)
-//            pieceTable.insert(1, "aa\n\r")
-//            str = str.substring(0, 1) + "aa\n\r" + str.substring(1)
-//            pieceTable.insert(7, "\na\r\n")
-//            str = str.substring(0, 7) + "\na\r\n" + str.substring(7)
-//            pieceTable.insert(5, "\n\na\r")
-//            str = str.substring(0, 5) + "\n\na\r" + str.substring(5)
-//            pieceTable.insert(10, "\r\r\n\r")
-//            str = str.substring(0, 10) + "\r\r\n\r" + str.substring(10)
-//            XCTAssertEqual(pieceTable.getLines(), str)
-//            pieceTable.delete(21, 3)
-//            str = str.substring(0, 21) + str.substring(21 + 3)
-//
-//            XCTAssertEqual(pieceTable.getLines(), str)
-//            assertTreeInvariants(pieceTable)
-//        })
-//
-//        test("random insert/delete \\r bug 4s", () => {
-//            let str = "a"
-//            let pieceTable = createTextBuffer(["a"])
-//            pieceTable.delete(0, 1)
-//            str = str.substring(0, 0) + str.substring(0 + 1)
-//            pieceTable.insert(0, "\naaa")
-//            str = str.substring(0, 0) + "\naaa" + str.substring(0)
-//            pieceTable.insert(2, "\n\naa")
-//            str = str.substring(0, 2) + "\n\naa" + str.substring(2)
-//            pieceTable.delete(1, 4)
-//            str = str.substring(0, 1) + str.substring(1 + 4)
-//            pieceTable.delete(3, 1)
-//            str = str.substring(0, 3) + str.substring(3 + 1)
-//            pieceTable.delete(1, 2)
-//            str = str.substring(0, 1) + str.substring(1 + 2)
-//            pieceTable.delete(0, 1)
-//            str = str.substring(0, 0) + str.substring(0 + 1)
-//            pieceTable.insert(0, "a\n\n\r")
-//            str = str.substring(0, 0) + "a\n\n\r" + str.substring(0)
-//            pieceTable.insert(2, "aa\r\n")
-//            str = str.substring(0, 2) + "aa\r\n" + str.substring(2)
-//            pieceTable.insert(3, "a\naa")
-//            str = str.substring(0, 3) + "a\naa" + str.substring(3)
-//
-//            XCTAssertEqual(pieceTable.getLines(), str)
-//            assertTreeInvariants(pieceTable)
-//        })
-//        test("random insert/delete \\r bug 5", () => {
-//            var str = ""
-//            let pieceTable = createTextBuffer([""])
-//            pieceTable.insert(0, "\n\n\n\r")
-//            str = str.substring(0, 0) + "\n\n\n\r" + str.substring(0)
-//            pieceTable.insert(1, "\n\n\n\r")
-//            str = str.substring(0, 1) + "\n\n\n\r" + str.substring(1)
-//            pieceTable.insert(2, "\n\r\r\r")
-//            str = str.substring(0, 2) + "\n\r\r\r" + str.substring(2)
-//            pieceTable.insert(8, "\n\r\n\r")
-//            str = str.substring(0, 8) + "\n\r\n\r" + str.substring(8)
-//            pieceTable.delete(5, 2)
-//            str = str.substring(0, 5) + str.substring(5 + 2)
-//            pieceTable.insert(4, "\n\r\r\r")
-//            str = str.substring(0, 4) + "\n\r\r\r" + str.substring(4)
-//            pieceTable.insert(8, "\n\n\n\r")
-//            str = str.substring(0, 8) + "\n\n\n\r" + str.substring(8)
-//            pieceTable.delete(0, 7)
-//            str = str.substring(0, 0) + str.substring(0 + 7)
-//            pieceTable.insert(1, "\r\n\r\r")
-//            str = str.substring(0, 1) + "\r\n\r\r" + str.substring(1)
-//            pieceTable.insert(15, "\n\r\r\r")
-//            str = str.substring(0, 15) + "\n\r\r\r" + str.substring(15)
-//
-//            XCTAssertEqual(pieceTable.getLines(), str)
-//            assertTreeInvariants(pieceTable)
-//        })
-//    })
-//
+    func testRandomInsertDeleteBug4 ()
+    {
+        //test("random insert/delete \\r bug 4s", () => {
+        var str = "a"
+        let pieceTable = createTextBuffer(["a"])
+        pieceTable.delete(offset: 0, cnt: 1)
+        str = str.substring(0, 0) + str.substring(0 + 1)
+        pieceTable.insert(0, "\naaa")
+        str = str.substring(0, 0) + "\naaa" + str.substring(0)
+        pieceTable.insert(2, "\n\naa")
+        str = str.substring(0, 2) + "\n\naa" + str.substring(2)
+        pieceTable.delete(offset: 1, cnt: 4)
+        str = str.substring(0, 1) + str.substring(1 + 4)
+        pieceTable.delete(offset: 3, cnt: 1)
+        str = str.substring(0, 3) + str.substring(3 + 1)
+        pieceTable.delete(offset: 1, cnt: 2)
+        str = str.substring(0, 1) + str.substring(1 + 2)
+        pieceTable.delete(offset: 0, cnt: 1)
+        str = str.substring(0, 0) + str.substring(0 + 1)
+        pieceTable.insert(0, "a\n\n\r")
+        str = str.substring(0, 0) + "a\n\n\r" + str.substring(0)
+        pieceTable.insert(2, "aa\r\n")
+        str = str.substring(0, 2) + "aa\r\n" + str.substring(2)
+        pieceTable.insert(3, "a\naa")
+        str = str.substring(0, 3) + "a\naa" + str.substring(3)
+
+        XCTAssertEqual(pieceTable.getLines(), str)
+        assertTreeInvariants(pieceTable)
+    }
+    
+    func testRandomInsertDeleteBug5 ()
+    {
+        // test("random insert/delete \\r bug 5", () => {
+        var str = ""
+        let pieceTable = createTextBuffer([""])
+        pieceTable.insert(0, "\n\n\n\r")
+        str = str.substring(0, 0) + "\n\n\n\r" + str.substring(0)
+        XCTAssertEqual(pieceTable.getLines(), str)
+        
+        pieceTable.insert(1, "\n\n\n\r")
+        str = str.substring(0, 1) + "\n\n\n\r" + str.substring(1)
+        XCTAssertEqual(pieceTable.getLines(), str)
+        
+        pieceTable.insert(2, "\n\r\r\r")
+        str = str.substring(0, 2) + "\n\r\r\r" + str.substring(2)
+        XCTAssertEqual(pieceTable.getLines(), str)
+        
+        pieceTable.insert(8, "\n\r\n\r")
+        str = str.substring(0, 8) + "\n\r\n\r" + str.substring(8)
+        XCTAssertEqual(pieceTable.getLines(), str)
+        
+        pieceTable.delete(offset: 5, cnt: 2)
+        str = str.substring(0, 5) + str.substring(5 + 2)
+        XCTAssertEqual(pieceTable.getLines(), str)
+        
+        pieceTable.insert(4, "\n\r\r\r")
+        str = str.substring(0, 4) + "\n\r\r\r" + str.substring(4)
+        XCTAssertEqual(pieceTable.getLines(), str)
+        
+        pieceTable.insert(8, "\n\n\n\r")
+        str = str.substring(0, 8) + "\n\n\n\r" + str.substring(8)
+        XCTAssertEqual(pieceTable.getLines(), str)
+        
+        pieceTable.delete(offset: 0, cnt: 7)
+        str = str.substring(0, 0) + str.substring(0 + 7)
+        XCTAssertEqual(pieceTable.getLines(), str)
+        
+        pieceTable.insert(1, "\r\n\r\r")
+        str = str.substring(0, 1) + "\r\n\r\r" + str.substring(1)
+        XCTAssertEqual(pieceTable.getLines(), str)
+        
+        pieceTable.insert(15, "\n\r\r\r")
+        var bstr = toBytes (str)
+        bstr = bstr [0..<15] + [10,13,13,13] + bstr[15...]
+        str = str.substring(0, 15) + "\n\r\r\r" + str.substring(15)
+        XCTAssertEqual(pieceTable.getLinesRawContent (), bstr)
+        
+        assertTreeInvariants(pieceTable)
+    }
+    
     func testPrefixSumForLineFeed ()
     {
         let pieceTable = createTextBuffer(["1\n2\n3\n4"])
@@ -869,143 +944,157 @@ class PieceTreeTextBufferTests: XCTestCase {
         testLinesContent(str, pieceTable)
         assertTreeInvariants(pieceTable)
     }
-//        test("random test value in range exception", () => {
-//            var str = ""
-//            let pieceTable = createTextBuffer([str])
-//
-//            pieceTable.insert(0, "XZ\nZ")
-//            str = str.substring(0, 0) + "XZ\nZ" + str.substring(0)
-//            pieceTable.delete(0, 3)
-//            str = str.substring(0, 0) + str.substring(0 + 3)
-//            pieceTable.delete(0, 1)
-//            str = str.substring(0, 0) + str.substring(0 + 1)
-//            pieceTable.insert(0, "ZYX\n")
-//            str = str.substring(0, 0) + "ZYX\n" + str.substring(0)
-//            pieceTable.delete(0, 4)
-//            str = str.substring(0, 0) + str.substring(0 + 4)
-//
-//            pieceTable.getValueInRange(new Range(1, 1, 1, 1))
-//            assertTreeInvariants(pieceTable)
-//        })
-//
-//        test("random tests bug 1", () => {
-//            var str = ""
-//            let pieceTable = createTextBuffer([""])
-//            pieceTable.insert(0, "huuyYzUfKOENwGgZLqn ")
-//            str = str.substring(0, 0) + "huuyYzUfKOENwGgZLqn " + str.substring(0)
-//            pieceTable.delete(18, 2)
-//            str = str.substring(0, 18) + str.substring(18 + 2)
-//            pieceTable.delete(3, 1)
-//            str = str.substring(0, 3) + str.substring(3 + 1)
-//            pieceTable.delete(12, 4)
-//            str = str.substring(0, 12) + str.substring(12 + 4)
-//            pieceTable.insert(3, "hMbnVEdTSdhLlPevXKF ")
-//            str = str.substring(0, 3) + "hMbnVEdTSdhLlPevXKF " + str.substring(3)
-//            pieceTable.delete(22, 8)
-//            str = str.substring(0, 22) + str.substring(22 + 8)
-//            pieceTable.insert(4, "S umSnYrqOmOAV\nEbZJ ")
-//            str = str.substring(0, 4) + "S umSnYrqOmOAV\nEbZJ " + str.substring(4)
-//            testLinesContent(str, pieceTable)
-//            assertTreeInvariants(pieceTable)
-//        })
-//
-//        test("random tests bug 2", () => {
-//            var str = ""
-//            let pieceTable = createTextBuffer([""])
-//            pieceTable.insert(0, "xfouRDZwdAHjVXJAMV\n ")
-//            str = str.substring(0, 0) + "xfouRDZwdAHjVXJAMV\n " + str.substring(0)
-//            pieceTable.insert(16, "dBGndxpFZBEAIKykYYx ")
-//            str = str.substring(0, 16) + "dBGndxpFZBEAIKykYYx " + str.substring(16)
-//            pieceTable.delete(7, 6)
-//            str = str.substring(0, 7) + str.substring(7 + 6)
-//            pieceTable.delete(9, 7)
-//            str = str.substring(0, 9) + str.substring(9 + 7)
-//            pieceTable.delete(17, 6)
-//            str = str.substring(0, 17) + str.substring(17 + 6)
-//            pieceTable.delete(0, 4)
-//            str = str.substring(0, 0) + str.substring(0 + 4)
-//            pieceTable.insert(9, "qvEFXCNvVkWgvykahYt ")
-//            str = str.substring(0, 9) + "qvEFXCNvVkWgvykahYt " + str.substring(9)
-//            pieceTable.delete(4, 6)
-//            str = str.substring(0, 4) + str.substring(4 + 6)
-//            pieceTable.insert(11, "OcSChUYT\nzPEBOpsGmR ")
-//            str =
-//                str.substring(0, 11) + "OcSChUYT\nzPEBOpsGmR " + str.substring(11)
-//            pieceTable.insert(15, "KJCozaXTvkE\nxnqAeTz ")
-//            str =
-//                str.substring(0, 15) + "KJCozaXTvkE\nxnqAeTz " + str.substring(15)
-//
-//            testLinesContent(str, pieceTable)
-//            assertTreeInvariants(pieceTable)
-//        })
-//
-//        test("get line content", () => {
-//            let pieceTable = createTextBuffer(["1"])
-//            XCTAssertEqual(pieceTable.getLineRawContent(1), "1")
-//            pieceTable.insert(1, "2")
-//            XCTAssertEqual(pieceTable.getLineRawContent(1), "12")
-//            assertTreeInvariants(pieceTable)
-//        })
-//
-//        test("get line content basic", () => {
-//            let pieceTable = createTextBuffer(["1\n2\n3\n4"])
-//            XCTAssertEqual(pieceTable.getLineRawContent(1), "1\n")
-//            XCTAssertEqual(pieceTable.getLineRawContent(2), "2\n")
-//            XCTAssertEqual(pieceTable.getLineRawContent(3), "3\n")
-//            XCTAssertEqual(pieceTable.getLineRawContent(4), "4")
-//            assertTreeInvariants(pieceTable)
-//        })
-//
-//        test("get line content after inserts/deletes", () => {
-//            let pieceTable = createTextBuffer(["a\nb\nc\nde"])
-//            pieceTable.insert(8, "fh\ni\njk")
-//            pieceTable.delete(7, 2)
-//            // "a\nb\nc\ndh\ni\njk"
-//
-//            XCTAssertEqual(pieceTable.getLineRawContent(1), "a\n")
-//            XCTAssertEqual(pieceTable.getLineRawContent(2), "b\n")
-//            XCTAssertEqual(pieceTable.getLineRawContent(3), "c\n")
-//            XCTAssertEqual(pieceTable.getLineRawContent(4), "dh\n")
-//            XCTAssertEqual(pieceTable.getLineRawContent(5), "i\n")
-//            XCTAssertEqual(pieceTable.getLineRawContent(6), "jk")
-//            assertTreeInvariants(pieceTable)
-//        })
-//
-//        test("random 1", () => {
-//            var str = ""
-//            let pieceTable = createTextBuffer([""])
-//
-//            pieceTable.insert(0, "J eNnDzQpnlWyjmUu\ny ")
-//            str = str.substring(0, 0) + "J eNnDzQpnlWyjmUu\ny " + str.substring(0)
-//            pieceTable.insert(0, "QPEeRAQmRwlJqtZSWhQ ")
-//            str = str.substring(0, 0) + "QPEeRAQmRwlJqtZSWhQ " + str.substring(0)
-//            pieceTable.delete(5, 1)
-//            str = str.substring(0, 5) + str.substring(5 + 1)
-//
-//            testLinesContent(str, pieceTable)
-//            assertTreeInvariants(pieceTable)
-//        })
-//
-//        test("random 2", () => {
-//            var str = ""
-//            let pieceTable = createTextBuffer([""])
-//            pieceTable.insert(0, "DZoQ tglPCRHMltejRI ")
-//            str = str.substring(0, 0) + "DZoQ tglPCRHMltejRI " + str.substring(0)
-//            pieceTable.insert(10, "JRXiyYqJ qqdcmbfkKX ")
-//            str = str.substring(0, 10) + "JRXiyYqJ qqdcmbfkKX " + str.substring(10)
-//            pieceTable.delete(16, 3)
-//            str = str.substring(0, 16) + str.substring(16 + 3)
-//            pieceTable.delete(25, 1)
-//            str = str.substring(0, 25) + str.substring(25 + 1)
-//            pieceTable.insert(18, "vH\nNlvfqQJPm\nSFkhMc ")
-//            str =
-//                str.substring(0, 18) + "vH\nNlvfqQJPm\nSFkhMc " + str.substring(18)
-//
-//            testLinesContent(str, pieceTable)
-//            assertTreeInvariants(pieceTable)
-//        })
-//    })
-//
+    
+    func testRandomTestValueInRangeException ()
+    {
+        // test("random test value in range exception", () => {
+        var str = ""
+        let pieceTable = createTextBuffer([str])
+
+        pieceTable.insert(0, "XZ\nZ")
+        str = str.substring(0, 0) + "XZ\nZ" + str.substring(0)
+        pieceTable.delete(offset: 0, cnt: 3)
+        str = str.substring(0, 0) + str.substring(0 + 3)
+        pieceTable.delete(offset: 0, cnt: 1)
+        str = str.substring(0, 0) + str.substring(0 + 1)
+        pieceTable.insert(0, "ZYX\n")
+        str = str.substring(0, 0) + "ZYX\n" + str.substring(0)
+        pieceTable.delete(offset: 0, cnt: 4)
+        str = str.substring(0, 0) + str.substring(0 + 4)
+
+        pieceTable.getValueInRange(range: Range(startLineNumber: 1, startColumn: 1, endLineNumber: 1, endColumn: 1))
+        assertTreeInvariants(pieceTable)
+    }
+    
+    func testRandomTestsBug1 ()
+    {
+        // test("random tests bug 1", () => {
+        var str = ""
+        let pieceTable = createTextBuffer([""])
+        pieceTable.insert(0, "huuyYzUfKOENwGgZLqn ")
+        str = str.substring(0, 0) + "huuyYzUfKOENwGgZLqn " + str.substring(0)
+        pieceTable.delete(offset: 18, cnt: 2)
+        str = str.substring(0, 18) + str.substring(18 + 2)
+        pieceTable.delete(offset: 3, cnt: 1)
+        str = str.substring(0, 3) + str.substring(3 + 1)
+        pieceTable.delete(offset: 12, cnt: 4)
+        str = str.substring(0, 12) + str.substring(12 + 4)
+        pieceTable.insert(3, "hMbnVEdTSdhLlPevXKF ")
+        str = str.substring(0, 3) + "hMbnVEdTSdhLlPevXKF " + str.substring(3)
+        pieceTable.delete(offset: 22, cnt: 8)
+        str = str.substring(0, 22) + str.substring(22 + 8)
+        pieceTable.insert(4, "S umSnYrqOmOAV\nEbZJ ")
+        str = str.substring(0, 4) + "S umSnYrqOmOAV\nEbZJ " + str.substring(4)
+        testLinesContent(str, pieceTable)
+        assertTreeInvariants(pieceTable)
+    }
+
+    func testRandomTestsBug2 ()
+    {
+        // test("random tests bug 2", () => {
+        var str = ""
+        let pieceTable = createTextBuffer([""])
+        pieceTable.insert(0, "xfouRDZwdAHjVXJAMV\n ")
+        str = str.substring(0, 0) + "xfouRDZwdAHjVXJAMV\n " + str.substring(0)
+        pieceTable.insert(16, "dBGndxpFZBEAIKykYYx ")
+        str = str.substring(0, 16) + "dBGndxpFZBEAIKykYYx " + str.substring(16)
+        pieceTable.delete(offset: 7, cnt: 6)
+        str = str.substring(0, 7) + str.substring(7 + 6)
+        pieceTable.delete(offset: 9, cnt: 7)
+        str = str.substring(0, 9) + str.substring(9 + 7)
+        pieceTable.delete(offset: 17, cnt: 6)
+        str = str.substring(0, 17) + str.substring(17 + 6)
+        pieceTable.delete(offset: 0, cnt: 4)
+        str = str.substring(0, 0) + str.substring(0 + 4)
+        pieceTable.insert(9, "qvEFXCNvVkWgvykahYt ")
+        str = str.substring(0, 9) + "qvEFXCNvVkWgvykahYt " + str.substring(9)
+        pieceTable.delete(offset: 4, cnt: 6)
+        str = str.substring(0, 4) + str.substring(4 + 6)
+        pieceTable.insert(11, "OcSChUYT\nzPEBOpsGmR ")
+        str =
+            str.substring(0, 11) + "OcSChUYT\nzPEBOpsGmR " + str.substring(11)
+        pieceTable.insert(15, "KJCozaXTvkE\nxnqAeTz ")
+        str =
+            str.substring(0, 15) + "KJCozaXTvkE\nxnqAeTz " + str.substring(15)
+
+        testLinesContent(str, pieceTable)
+        assertTreeInvariants(pieceTable)
+    }
+    
+    func testGetLineContent ()
+    {
+        // test("get line content", () => {
+        let pieceTable = createTextBuffer(["1"])
+        XCTAssertEqual(pieceTable.getLineRawContent(1), toBytes ("1"))
+        pieceTable.insert(1, "2")
+        XCTAssertEqual(pieceTable.getLineRawContent(1), toBytes ("12"))
+        assertTreeInvariants(pieceTable)
+    }
+    
+    func testGetLineContentBasic ()
+    {
+        // test("get line content basic", () => {
+        let pieceTable = createTextBuffer(["1\n2\n3\n4"])
+        XCTAssertEqual(pieceTable.getLineRawContent(1), toBytes ("1\n"))
+        XCTAssertEqual(pieceTable.getLineRawContent(2), toBytes ("2\n"))
+        XCTAssertEqual(pieceTable.getLineRawContent(3), toBytes ("3\n"))
+        XCTAssertEqual(pieceTable.getLineRawContent(4), toBytes ("4"))
+        assertTreeInvariants(pieceTable)
+    }
+    
+    func testGetLineContentAfterInsertDeletes ()
+    {
+        // test("get line content after inserts/deletes", () => {
+        let pieceTable = createTextBuffer(["a\nb\nc\nde"])
+        pieceTable.insert(8, "fh\ni\njk")
+        pieceTable.delete(offset: 7, cnt: 2)
+        // "a\nb\nc\ndh\ni\njk"
+
+        XCTAssertEqual(pieceTable.getLineRawContent(1), toBytes ("a\n"))
+        XCTAssertEqual(pieceTable.getLineRawContent(2), toBytes ("b\n"))
+        XCTAssertEqual(pieceTable.getLineRawContent(3), toBytes ("c\n"))
+        XCTAssertEqual(pieceTable.getLineRawContent(4), toBytes ("dh\n"))
+        XCTAssertEqual(pieceTable.getLineRawContent(5), toBytes ("i\n"))
+        XCTAssertEqual(pieceTable.getLineRawContent(6), toBytes ("jk"))
+        assertTreeInvariants(pieceTable)
+    }
+
+    func testRandom10 ()
+    {
+        // test("random 1", () => {
+        var str = ""
+        let pieceTable = createTextBuffer([""])
+
+        pieceTable.insert(0, "J eNnDzQpnlWyjmUu\ny ")
+        str = str.substring(0, 0) + "J eNnDzQpnlWyjmUu\ny " + str.substring(0)
+        pieceTable.insert(0, "QPEeRAQmRwlJqtZSWhQ ")
+        str = str.substring(0, 0) + "QPEeRAQmRwlJqtZSWhQ " + str.substring(0)
+        pieceTable.delete(offset: 5, cnt: 1)
+        str = str.substring(0, 5) + str.substring(5 + 1)
+
+        testLinesContent(str, pieceTable)
+        assertTreeInvariants(pieceTable)
+    }
+    
+    func testRandom12 ()
+    {
+        // test("random 2", () => {
+        var str = ""
+        let pieceTable = createTextBuffer([""])
+        pieceTable.insert(0, "DZoQ tglPCRHMltejRI ")
+        str = str.substring(0, 0) + "DZoQ tglPCRHMltejRI " + str.substring(0)
+        pieceTable.insert(10, "JRXiyYqJ qqdcmbfkKX ")
+        str = str.substring(0, 10) + "JRXiyYqJ qqdcmbfkKX " + str.substring(10)
+        pieceTable.delete(offset: 16, cnt: 3)
+        str = str.substring(0, 16) + str.substring(16 + 3)
+        pieceTable.delete(offset: 25, cnt: 1)
+        str = str.substring(0, 25) + str.substring(25 + 1)
+        pieceTable.insert(18, "vH\nNlvfqQJPm\nSFkhMc ")
+        str = str.substring(0, 18) + "vH\nNlvfqQJPm\nSFkhMc " + str.substring(18)
+
+        testLinesContent(str, pieceTable)
+        assertTreeInvariants(pieceTable)
+    }
 
     func testCRLF_deleteCRinCRLF1 ()
     {
@@ -1027,7 +1116,7 @@ class PieceTreeTextBufferTests: XCTestCase {
         XCTAssertEqual(pieceTable.lineCount, 2)
         assertTreeInvariants(pieceTable)
     }
-//
+
 //        test("random bug 1", () => {
 //            var str = ""
 //            let pieceTable = createTextBuffer([""], false)
@@ -1222,268 +1311,305 @@ class PieceTreeTextBufferTests: XCTestCase {
 //            assertTreeInvariants(pieceTable)
 //        })
 //    })
-//
-//    suite("centralized lineStarts with CRLF", () => {
-//        test("delete CR in CRLF 1", () => {
-//            let pieceTable = createTextBuffer(["a\r\nb"], false)
-//            pieceTable.delete(2, 2)
-//            XCTAssertEqual(pieceTable.lineCount, 2)
-//            assertTreeInvariants(pieceTable)
-//        })
-//        test("delete CR in CRLF 2", () => {
-//            let pieceTable = createTextBuffer(["a\r\nb"])
-//            pieceTable.delete(0, 2)
-//
-//            XCTAssertEqual(pieceTable.lineCount, 2)
-//            assertTreeInvariants(pieceTable)
-//        })
-//
-//        test("random bug 1", () => {
-//            let str = "\n\n\r\r"
-//            let pieceTable = createTextBuffer(["\n\n\r\r"], false)
-//            pieceTable.insert(1, "\r\n\r\n")
-//            str = str.substring(0, 1) + "\r\n\r\n" + str.substring(1)
-//            pieceTable.delete(5, 3)
-//            str = str.substring(0, 5) + str.substring(5 + 3)
-//            pieceTable.delete(2, 3)
-//            str = str.substring(0, 2) + str.substring(2 + 3)
-//
-//            let lines = str.split(/\r\n|\r|\n/)
-//            XCTAssertEqual(pieceTable.lineCount, lines.count)
-//            assertTreeInvariants(pieceTable)
-//        })
-//        test("random bug 2", () => {
-//            let str = "\n\r\n\r"
-//            let pieceTable = createTextBuffer(["\n\r\n\r"], false)
-//
-//            pieceTable.insert(2, "\n\r\r\r")
-//            str = str.substring(0, 2) + "\n\r\r\r" + str.substring(2)
-//            pieceTable.delete(4, 1)
-//            str = str.substring(0, 4) + str.substring(4 + 1)
-//
-//            let lines = str.split(/\r\n|\r|\n/)
-//            XCTAssertEqual(pieceTable.lineCount, lines.count)
-//            assertTreeInvariants(pieceTable)
-//        })
-//
-//        test("random bug 3", () => {
-//            let str = "\n\n\n\r"
-//            let pieceTable = createTextBuffer(["\n\n\n\r"], false)
-//
-//            pieceTable.delete(2, 2)
-//            str = str.substring(0, 2) + str.substring(2 + 2)
-//            pieceTable.delete(0, 2)
-//            str = str.substring(0, 0) + str.substring(0 + 2)
-//            pieceTable.insert(0, "\r\r\r\r")
-//            str = str.substring(0, 0) + "\r\r\r\r" + str.substring(0)
-//            pieceTable.insert(2, "\r\n\r\r")
-//            str = str.substring(0, 2) + "\r\n\r\r" + str.substring(2)
-//            pieceTable.insert(3, "\r\r\r\n")
-//            str = str.substring(0, 3) + "\r\r\r\n" + str.substring(3)
-//
-//            let lines = str.split(/\r\n|\r|\n/)
-//            XCTAssertEqual(pieceTable.lineCount, lines.count)
-//            assertTreeInvariants(pieceTable)
-//        })
-//
-//        test("random bug 4", () => {
-//            let str = "\n\n\n\n"
-//            let pieceTable = createTextBuffer(["\n\n\n\n"], false)
-//
-//            pieceTable.delete(3, 1)
-//            str = str.substring(0, 3) + str.substring(3 + 1)
-//            pieceTable.insert(1, "\r\r\r\r")
-//            str = str.substring(0, 1) + "\r\r\r\r" + str.substring(1)
-//            pieceTable.insert(6, "\r\n\n\r")
-//            str = str.substring(0, 6) + "\r\n\n\r" + str.substring(6)
-//            pieceTable.delete(5, 3)
-//            str = str.substring(0, 5) + str.substring(5 + 3)
-//
-//            testLinesContent(str, pieceTable)
-//            assertTreeInvariants(pieceTable)
-//        })
-//
-//        test("random bug 5", () => {
-//            let str = "\n\n\n\n"
-//            let pieceTable = createTextBuffer(["\n\n\n\n"], false)
-//
-//            pieceTable.delete(3, 1)
-//            str = str.substring(0, 3) + str.substring(3 + 1)
-//            pieceTable.insert(0, "\n\r\r\n")
-//            str = str.substring(0, 0) + "\n\r\r\n" + str.substring(0)
-//            pieceTable.insert(4, "\n\r\r\n")
-//            str = str.substring(0, 4) + "\n\r\r\n" + str.substring(4)
-//            pieceTable.delete(4, 3)
-//            str = str.substring(0, 4) + str.substring(4 + 3)
-//            pieceTable.insert(5, "\r\r\n\r")
-//            str = str.substring(0, 5) + "\r\r\n\r" + str.substring(5)
-//            pieceTable.insert(12, "\n\n\n\r")
-//            str = str.substring(0, 12) + "\n\n\n\r" + str.substring(12)
-//            pieceTable.insert(5, "\r\r\r\n")
-//            str = str.substring(0, 5) + "\r\r\r\n" + str.substring(5)
-//            pieceTable.insert(20, "\n\n\r\n")
-//            str = str.substring(0, 20) + "\n\n\r\n" + str.substring(20)
-//
-//            testLinesContent(str, pieceTable)
-//            assertTreeInvariants(pieceTable)
-//        })
-//
-//        test("random bug 6", () => {
-//            let str = "\n\r\r\n"
-//            let pieceTable = createTextBuffer(["\n\r\r\n"], false)
-//
-//            pieceTable.insert(4, "\r\n\n\r")
-//            str = str.substring(0, 4) + "\r\n\n\r" + str.substring(4)
-//            pieceTable.insert(3, "\r\n\n\n")
-//            str = str.substring(0, 3) + "\r\n\n\n" + str.substring(3)
-//            pieceTable.delete(4, 8)
-//            str = str.substring(0, 4) + str.substring(4 + 8)
-//            pieceTable.insert(4, "\r\n\n\r")
-//            str = str.substring(0, 4) + "\r\n\n\r" + str.substring(4)
-//            pieceTable.insert(0, "\r\n\n\r")
-//            str = str.substring(0, 0) + "\r\n\n\r" + str.substring(0)
-//            pieceTable.delete(4, 0)
-//            str = str.substring(0, 4) + str.substring(4 + 0)
-//            pieceTable.delete(8, 4)
-//            str = str.substring(0, 8) + str.substring(8 + 4)
-//
-//            testLinesContent(str, pieceTable)
-//            assertTreeInvariants(pieceTable)
-//        })
-//
-//        test("random bug 7", () => {
-//            let str = "\r\n\n\r"
-//            let pieceTable = createTextBuffer(["\r\n\n\r"], false)
-//
-//            pieceTable.delete(1, 0)
-//            str = str.substring(0, 1) + str.substring(1 + 0)
-//            pieceTable.insert(3, "\n\n\n\r")
-//            str = str.substring(0, 3) + "\n\n\n\r" + str.substring(3)
-//            pieceTable.insert(7, "\n\n\r\n")
-//            str = str.substring(0, 7) + "\n\n\r\n" + str.substring(7)
-//
-//            testLinesContent(str, pieceTable)
-//            assertTreeInvariants(pieceTable)
-//        })
-//
-//        test("random bug 8", () => {
-//            let str = "\r\r\n\n"
-//            let pieceTable = createTextBuffer(["\r\r\n\n"], false)
-//
-//            pieceTable.insert(4, "\r\n\n\r")
-//            str = str.substring(0, 4) + "\r\n\n\r" + str.substring(4)
-//            pieceTable.insert(7, "\n\r\r\r")
-//            str = str.substring(0, 7) + "\n\r\r\r" + str.substring(7)
-//            pieceTable.insert(11, "\n\n\r\n")
-//            str = str.substring(0, 11) + "\n\n\r\n" + str.substring(11)
-//            testLinesContent(str, pieceTable)
-//            assertTreeInvariants(pieceTable)
-//        })
-//
-//        test("random bug 9", () => {
-//            let str = "qneW"
-//            let pieceTable = createTextBuffer(["qneW"], false)
-//
-//            pieceTable.insert(0, "YhIl")
-//            str = str.substring(0, 0) + "YhIl" + str.substring(0)
-//            pieceTable.insert(0, "qdsm")
-//            str = str.substring(0, 0) + "qdsm" + str.substring(0)
-//            pieceTable.delete(7, 0)
-//            str = str.substring(0, 7) + str.substring(7 + 0)
-//            pieceTable.insert(12, "iiPv")
-//            str = str.substring(0, 12) + "iiPv" + str.substring(12)
-//            pieceTable.insert(9, "V\rSA")
-//            str = str.substring(0, 9) + "V\rSA" + str.substring(9)
-//
-//            testLinesContent(str, pieceTable)
-//            assertTreeInvariants(pieceTable)
-//        })
-//
-//        test("random bug 10", () => {
-//            let str = "\n\n\n\n"
-//            let pieceTable = createTextBuffer(["\n\n\n\n"], false)
-//
-//            pieceTable.insert(3, "\n\r\n\r")
-//            str = str.substring(0, 3) + "\n\r\n\r" + str.substring(3)
-//            pieceTable.insert(2, "\n\r\n\n")
-//            str = str.substring(0, 2) + "\n\r\n\n" + str.substring(2)
-//            pieceTable.insert(0, "\n\n\r\r")
-//            str = str.substring(0, 0) + "\n\n\r\r" + str.substring(0)
-//            pieceTable.insert(3, "\r\r\r\r")
-//            str = str.substring(0, 3) + "\r\r\r\r" + str.substring(3)
-//            pieceTable.insert(3, "\n\n\r\r")
-//            str = str.substring(0, 3) + "\n\n\r\r" + str.substring(3)
-//
-//            testLinesContent(str, pieceTable)
-//            assertTreeInvariants(pieceTable)
-//        })
-//
-//        test("random chunk bug 1", () => {
-//            let pieceTable = createTextBuffer(["\n\r\r\n\n\n\r\n\r"], false)
-//            let str = "\n\r\r\n\n\n\r\n\r"
-//            pieceTable.delete(0, 2)
-//            str = str.substring(0, 0) + str.substring(0 + 2)
-//            pieceTable.insert(1, "\r\r\n\n")
-//            str = str.substring(0, 1) + "\r\r\n\n" + str.substring(1)
-//            pieceTable.insert(7, "\r\r\r\r")
-//            str = str.substring(0, 7) + "\r\r\r\r" + str.substring(7)
-//
-//            XCTAssertEqual(pieceTable.getLines(), str)
-//            testLineStarts(str, pieceTable)
-//            assertTreeInvariants(pieceTable)
-//        })
-//
-//        test("random chunk bug 2", () => {
-//            let pieceTable = createTextBuffer([
-//                "\n\r\n\n\n\r\n\r\n\r\r\n\n\n\r\r\n\r\n"
-//            ], false)
-//            let str = "\n\r\n\n\n\r\n\r\n\r\r\n\n\n\r\r\n\r\n"
-//            pieceTable.insert(16, "\r\n\r\r")
-//            str = str.substring(0, 16) + "\r\n\r\r" + str.substring(16)
-//            pieceTable.insert(13, "\n\n\r\r")
-//            str = str.substring(0, 13) + "\n\n\r\r" + str.substring(13)
-//            pieceTable.insert(19, "\n\n\r\n")
-//            str = str.substring(0, 19) + "\n\n\r\n" + str.substring(19)
-//            pieceTable.delete(5, 0)
-//            str = str.substring(0, 5) + str.substring(5 + 0)
-//            pieceTable.delete(11, 2)
-//            str = str.substring(0, 11) + str.substring(11 + 2)
-//
-//            XCTAssertEqual(pieceTable.getLines(), str)
-//            testLineStarts(str, pieceTable)
-//            assertTreeInvariants(pieceTable)
-//        })
-//
-//        test("random chunk bug 3", () => {
-//            let pieceTable = createTextBuffer(["\r\n\n\n\n\n\n\r\n"], false)
-//            let str = "\r\n\n\n\n\n\n\r\n"
-//            pieceTable.insert(4, "\n\n\r\n\r\r\n\n\r")
-//            str = str.substring(0, 4) + "\n\n\r\n\r\r\n\n\r" + str.substring(4)
-//            pieceTable.delete(4, 4)
-//            str = str.substring(0, 4) + str.substring(4 + 4)
-//            pieceTable.insert(11, "\r\n\r\n\n\r\r\n\n")
-//            str = str.substring(0, 11) + "\r\n\r\n\n\r\r\n\n" + str.substring(11)
-//            pieceTable.delete(1, 2)
-//            str = str.substring(0, 1) + str.substring(1 + 2)
-//
-//            XCTAssertEqual(pieceTable.getLines(), str)
-//            testLineStarts(str, pieceTable)
-//            assertTreeInvariants(pieceTable)
-//        })
-//
-//        test("random chunk bug 4", () => {
-//            let pieceTable = createTextBuffer(["\n\r\n\r"], false)
-//            let str = "\n\r\n\r"
-//            pieceTable.insert(4, "\n\n\r\n")
-//            str = str.substring(0, 4) + "\n\n\r\n" + str.substring(4)
-//            pieceTable.insert(3, "\r\n\n\n")
-//            str = str.substring(0, 3) + "\r\n\n\n" + str.substring(3)
-//
-//            XCTAssertEqual(pieceTable.getLines(), str)
-//            testLineStarts(str, pieceTable)
-//            assertTreeInvariants(pieceTable)
-//        })
-//    })
+
+    // suite("centralized lineStarts with CRLF", () => {
+    
+    func testDeleteCRinCRLF1 ()
+    {
+        let pieceTable = createTextBuffer(["a\r\nb"], false)
+        pieceTable.delete(offset: 2, cnt: 2)
+        XCTAssertEqual(pieceTable.lineCount, 2)
+        assertTreeInvariants(pieceTable)
+    }
+    
+    func testDeleteCRinCRLf2 ()
+    {
+        //test("delete CR in CRLF 2", () => {
+        let pieceTable = createTextBuffer(["a\r\nb"])
+        pieceTable.delete(offset: 0, cnt: 2)
+
+        XCTAssertEqual(pieceTable.lineCount, 2)
+        assertTreeInvariants(pieceTable)
+    }
+
+    func testCentralized_Random1 ()
+    {
+        // test("random bug 1", () => {
+        var str = "\n\n\r\r"
+        let pieceTable = createTextBuffer(["\n\n\r\r"], false)
+        pieceTable.insert(1, "\r\n\r\n")
+        str = str.substring(0, 1) + "\r\n\r\n" + str.substring(1)
+        pieceTable.delete(offset: 5, cnt: 3)
+        str = str.substring(0, 5) + str.substring(5 + 3)
+        pieceTable.delete(offset: 2, cnt: 3)
+        str = str.substring(0, 2) + str.substring(2 + 3)
+
+        // TODO: split
+        // let lines = str.split(/\r,\n|\r|\n/)
+        // XCTAssertEqual(pieceTable.lineCount, lines.count)
+        assertTreeInvariants(pieceTable)
+    }
+    
+    func testCentralized_random2 ()
+    {
+        // test("random bug 2", () => {
+        var str = "\n\r\n\r"
+        let pieceTable = createTextBuffer(["\n\r\n\r"], false)
+
+        pieceTable.insert(2, "\n\r\r\r")
+        str = str.substring(0, 2) + "\n\r\r\r" + str.substring(2)
+        pieceTable.delete(offset: 4, cnt: 1)
+        str = str.substring(0, 4) + str.substring(4 + 1)
+
+        // TODO: split
+        // let lines = str.split(/\r,\n|\r|\n/)
+        //XCTAssertEqual(pieceTable.lineCount, lines.count)
+        assertTreeInvariants(pieceTable)
+    }
+
+    func testCentralized_random3 ()
+    {
+        // test("random bug 3", () => {
+        var str = "\n\n\n\r"
+        let pieceTable = createTextBuffer(["\n\n\n\r"], false)
+
+        pieceTable.delete(offset: 2, cnt: 2)
+        str = str.substring(0, 2) + str.substring(2 + 2)
+        pieceTable.delete(offset: 0, cnt: 2)
+        str = str.substring(0, 0) + str.substring(0 + 2)
+        pieceTable.insert(0, "\r\r\r\r")
+        str = str.substring(0, 0) + "\r\r\r\r" + str.substring(0)
+        pieceTable.insert(2, "\r\n\r\r")
+        str = str.substring(0, 2) + "\r\n\r\r" + str.substring(2)
+        pieceTable.insert(3, "\r\r\r\n")
+        str = str.substring(0, 3) + "\r\r\r\n" + str.substring(3)
+
+        // TODO: Split
+        // let lines = str.split(/\r,\n|\r|\n/)
+        //XCTAssertEqual(pieceTable.lineCount, lines.count)
+        assertTreeInvariants(pieceTable)
+    }
+
+    func BYTES_testCentralized_random4 ()
+    {
+        // test("random bug 4", () => {
+        var str = "\n\n\n\n"
+        let pieceTable = createTextBuffer(["\n\n\n\n"], false)
+
+        pieceTable.delete(offset: 3, cnt: 1)
+        str = str.substring(0, 3) + str.substring(3 + 1)
+        pieceTable.insert(1, "\r\r\r\r")
+        str = str.substring(0, 1) + "\r\r\r\r" + str.substring(1)
+        pieceTable.insert(6, "\r\n\n\r")
+        str = str.substring(0, 6) + "\r\n\n\r" + str.substring(6)
+        pieceTable.delete(offset: 5, cnt: 3)
+        str = str.substring(0, 5) + str.substring(5 + 3)
+
+        testLinesContent(str, pieceTable)
+        assertTreeInvariants(pieceTable)
+    }
+
+    func BYTES_testCentralized_testrandom5 ()
+    {
+        // ("random bug 5", () => {
+        var str = "\n\n\n\n"
+        let pieceTable = createTextBuffer(["\n\n\n\n"], false)
+
+        pieceTable.delete(offset: 3, cnt: 1)
+        str = str.substring(0, 3) + str.substring(3 + 1)
+        pieceTable.insert(0, "\n\r\r\n")
+        str = str.substring(0, 0) + "\n\r\r\n" + str.substring(0)
+        pieceTable.insert(4, "\n\r\r\n")
+        str = str.substring(0, 4) + "\n\r\r\n" + str.substring(4)
+        pieceTable.delete(offset: 4, cnt: 3)
+        str = str.substring(0, 4) + str.substring(4 + 3)
+        pieceTable.insert(5, "\r\r\n\r")
+        str = str.substring(0, 5) + "\r\r\n\r" + str.substring(5)
+        pieceTable.insert(12, "\n\n\n\r")
+        str = str.substring(0, 12) + "\n\n\n\r" + str.substring(12)
+        pieceTable.insert(5, "\r\r\r\n")
+        str = str.substring(0, 5) + "\r\r\r\n" + str.substring(5)
+        pieceTable.insert(20, "\n\n\r\n")
+        str = str.substring(0, 20) + "\n\n\r\n" + str.substring(20)
+
+        testLinesContent(str, pieceTable)
+        assertTreeInvariants(pieceTable)
+    }
+
+    func BYTES_testCentralized_random6 ()
+    {
+        // test("random bug 6", () => {
+        var str = "\n\r\r\n"
+        let pieceTable = createTextBuffer(["\n\r\r\n"], false)
+
+        pieceTable.insert(4, "\r\n\n\r")
+        str = str.substring(0, 4) + "\r\n\n\r" + str.substring(4)
+        pieceTable.insert(3, "\r\n\n\n")
+        str = str.substring(0, 3) + "\r\n\n\n" + str.substring(3)
+        pieceTable.delete(offset: 4, cnt: 8)
+        str = str.substring(0, 4) + str.substring(4 + 8)
+        pieceTable.insert(4, "\r\n\n\r")
+        str = str.substring(0, 4) + "\r\n\n\r" + str.substring(4)
+        pieceTable.insert(0, "\r\n\n\r")
+        str = str.substring(0, 0) + "\r\n\n\r" + str.substring(0)
+        pieceTable.delete(offset: 4, cnt: 0)
+        str = str.substring(0, 4) + str.substring(4 + 0)
+        pieceTable.delete(offset: 8, cnt: 4)
+        str = str.substring(0, 8) + str.substring(8 + 4)
+
+        testLinesContent(str, pieceTable)
+        assertTreeInvariants(pieceTable)
+    }
+
+    func BYTES_testCentralized_random7 ()
+    {
+        // test("random bug 7", () => {
+        var str = "\r\n\n\r"
+        let pieceTable = createTextBuffer(["\r\n\n\r"], false)
+
+        pieceTable.delete(offset: 1, cnt: 0)
+        str = str.substring(0, 1) + str.substring(1 + 0)
+        pieceTable.insert(3, "\n\n\n\r")
+        str = str.substring(0, 3) + "\n\n\n\r" + str.substring(3)
+        pieceTable.insert(7, "\n\n\r\n")
+        str = str.substring(0, 7) + "\n\n\r\n" + str.substring(7)
+
+        testLinesContent(str, pieceTable)
+        assertTreeInvariants(pieceTable)
+    }
+
+    func BYES_testCentralized_random8 ()
+    {
+        // test("random bug 8", () => {
+        var str = "\r\r\n\n"
+        let pieceTable = createTextBuffer(["\r\r\n\n"], false)
+
+        pieceTable.insert(4, "\r\n\n\r")
+        str = str.substring(0, 4) + "\r\n\n\r" + str.substring(4)
+        pieceTable.insert(7, "\n\r\r\r")
+        str = str.substring(0, 7) + "\n\r\r\r" + str.substring(7)
+        pieceTable.insert(11, "\n\n\r\n")
+        str = str.substring(0, 11) + "\n\n\r\n" + str.substring(11)
+        testLinesContent(str, pieceTable)
+        assertTreeInvariants(pieceTable)
+    }
+
+    func testCentralized_random9 ()
+    {
+        // test("random bug 9", () => {
+        var str = "qneW"
+        let pieceTable = createTextBuffer(["qneW"], false)
+
+        pieceTable.insert(0, "YhIl")
+        str = str.substring(0, 0) + "YhIl" + str.substring(0)
+        pieceTable.insert(0, "qdsm")
+        str = str.substring(0, 0) + "qdsm" + str.substring(0)
+        pieceTable.delete(offset: 7, cnt: 0)
+        str = str.substring(0, 7) + str.substring(7 + 0)
+        pieceTable.insert(12, "iiPv")
+        str = str.substring(0, 12) + "iiPv" + str.substring(12)
+        pieceTable.insert(9, "V\rSA")
+        str = str.substring(0, 9) + "V\rSA" + str.substring(9)
+
+        testLinesContent(str, pieceTable)
+        assertTreeInvariants(pieceTable)
+    }
+
+    func BYTES_testCentralized_random10 ()
+    {
+        // test("random bug 10", () => {
+        var str = "\n\n\n\n"
+        let pieceTable = createTextBuffer(["\n\n\n\n"], false)
+
+        pieceTable.insert(3, "\n\r\n\r")
+        str = str.substring(0, 3) + "\n\r\n\r" + str.substring(3)
+        pieceTable.insert(2, "\n\r\n\n")
+        str = str.substring(0, 2) + "\n\r\n\n" + str.substring(2)
+        pieceTable.insert(0, "\n\n\r\r")
+        str = str.substring(0, 0) + "\n\n\r\r" + str.substring(0)
+        pieceTable.insert(3, "\r\r\r\r")
+        str = str.substring(0, 3) + "\r\r\r\r" + str.substring(3)
+        pieceTable.insert(3, "\n\n\r\r")
+        str = str.substring(0, 3) + "\n\n\r\r" + str.substring(3)
+
+        testLinesContent(str, pieceTable)
+        assertTreeInvariants(pieceTable)
+    }
+
+    func testCentralized_randomchunk1 ()
+    {
+        // test("random chunk bug 1", () => {
+        let pieceTable = createTextBuffer(["\n\r\r\n\n\n\r\n\r"], false)
+        var str = "\n\r\r\n\n\n\r\n\r"
+        pieceTable.delete(offset: 0, cnt: 2)
+        str = str.substring(0, 0) + str.substring(0 + 2)
+        pieceTable.insert(1, "\r\r\n\n")
+        str = str.substring(0, 1) + "\r\r\n\n" + str.substring(1)
+        pieceTable.insert(7, "\r\r\r\r")
+        str = str.substring(0, 7) + "\r\r\r\r" + str.substring(7)
+
+        XCTAssertEqual(pieceTable.getLines(), str)
+        testLineStarts(str, pieceTable)
+        assertTreeInvariants(pieceTable)
+    }
+
+    func BYTES_testCentralized_randomchunkbug2 ()
+    {
+        // test("random chunk bug 2", () => {
+        let pieceTable = createTextBuffer([
+            "\n\r\n\n\n\r\n\r\n\r\r\n\n\n\r\r\n\r\n"
+        ], false)
+        var str = "\n\r\n\n\n\r\n\r\n\r\r\n\n\n\r\r\n\r\n"
+        pieceTable.insert(16, "\r\n\r\r")
+        str = str.substring(0, 16) + "\r\n\r\r" + str.substring(16)
+        pieceTable.insert(13, "\n\n\r\r")
+        str = str.substring(0, 13) + "\n\n\r\r" + str.substring(13)
+        pieceTable.insert(19, "\n\n\r\n")
+        str = str.substring(0, 19) + "\n\n\r\n" + str.substring(19)
+        pieceTable.delete(offset: 5, cnt: 0)
+        str = str.substring(0, 5) + str.substring(5 + 0)
+        pieceTable.delete(offset: 11, cnt: 2)
+        str = str.substring(0, 11) + str.substring(11 + 2)
+
+        XCTAssertEqual(pieceTable.getLines(), str)
+        testLineStarts(str, pieceTable)
+        assertTreeInvariants(pieceTable)
+    }
+
+    func BYTES_testCentralized_randomchunnkbug3 ()
+    {
+        // test("random chunk bug 3", () => {
+        let pieceTable = createTextBuffer(["\r\n\n\n\n\n\n\r\n"], false)
+        var str = "\r\n\n\n\n\n\n\r\n"
+        pieceTable.insert(4, "\n\n\r\n\r\r\n\n\r")
+        str = str.substring(0, 4) + "\n\n\r\n\r\r\n\n\r" + str.substring(4)
+        pieceTable.delete(offset: 4, cnt: 4)
+        str = str.substring(0, 4) + str.substring(4 + 4)
+        pieceTable.insert(11, "\r\n\r\n\n\r\r\n\n")
+        str = str.substring(0, 11) + "\r\n\r\n\n\r\r\n\n" + str.substring(11)
+        pieceTable.delete(offset: 1, cnt: 2)
+        str = str.substring(0, 1) + str.substring(1 + 2)
+
+        XCTAssertEqual(pieceTable.getLines(), str)
+        testLineStarts(str, pieceTable)
+        assertTreeInvariants(pieceTable)
+    }
+
+    func testCentralized_randomchunkbug4 ()
+    {
+        // test("random chunk bug 4", () => {
+        let pieceTable = createTextBuffer(["\n\r\n\r"], false)
+        var str = "\n\r\n\r"
+        pieceTable.insert(4, "\n\n\r\n")
+        str = str.substring(0, 4) + "\n\n\r\n" + str.substring(4)
+        pieceTable.insert(3, "\r\n\n\n")
+        str = str.substring(0, 3) + "\r\n\n\n" + str.substring(3)
+
+        XCTAssertEqual(pieceTable.getLines(), str)
+        testLineStarts(str, pieceTable)
+        assertTreeInvariants(pieceTable)
+    }
+
 //
 //    suite("random is unsupervised", () => {
 //        test("splitting large change buffer", function () {
@@ -1518,8 +1644,7 @@ class PieceTreeTextBufferTests: XCTestCase {
 //            assertTreeInvariants(pieceTable)
 //        })
 
-    // UNDO the change to Alphabet to include \r\n in the random string
-    func NOT_YET_NEWLINES_ARE_BREAKING_testRandomInsertDelete ()
+    func testRandomInsertDelete ()
     {
         //        test("random insert delete", function () {
 
@@ -1527,7 +1652,7 @@ class PieceTreeTextBufferTests: XCTestCase {
         let pieceTable = createTextBuffer([str], false)
 
         // let output = ""
-        for _ in 0..<100 {
+        for _ in 0..<1000 {
             if Int.random(in:0..<10) < 6 {
                 // insert
                 let text = randomStr(100)
@@ -1559,41 +1684,43 @@ class PieceTreeTextBufferTests: XCTestCase {
         assertTreeInvariants(pieceTable)
     }
     
-//
-//        test("random chunks", function () {
-//            this.timeout(500000)
-//            let chunks: string[] = []
-//            for (let i = 0 i < 5 i++) {
-//                chunks.push(randomStr(1000))
-//            }
-//
-//            let pieceTable = createTextBuffer(chunks, false)
-//            let str = chunks.join("")
-//
-//            for (let i = 0 i < 1000 i++) {
-//                if (Math.random() < 0.6) {
-//                    // insert
-//                    let text = randomStr(100)
-//                    let pos = randomInt(str.count + 1)
-//                    pieceTable.insert(pos, text)
-//                    str = str.substring(0, pos) + text + str.substring(pos)
-//                } else {
-//                    // delete
-//                    let pos = randomInt(str.count)
-//                    let length = Math.min(
-//                        str.count - pos,
-//                        Math.floor(Math.random() * 10)
-//                    )
-//                    pieceTable.delete(pos, length)
-//                    str = str.substring(0, pos) + str.substring(pos + length)
-//                }
-//            }
-//
-//            XCTAssertEqual(pieceTable.getLines(), str)
-//            testLineStarts(str, pieceTable)
-//            testLinesContent(str, pieceTable)
-//            assertTreeInvariants(pieceTable)
-//        })
+    func testRandomChunks ()
+    {
+        // test("random chunks", function () {
+
+        var chunks: [String] = []
+        for _ in 0..<5 {
+            chunks.append (randomStr(1000))
+        }
+
+        let pieceTable = createTextBuffer(chunks, false)
+        var str = chunks.joined(separator: "")
+
+        for _ in 0..<1000 {
+            if Int.random (in: 0...10) < 6 {
+                // insert
+                let text = randomStr(100)
+                let pos = Int.random (in: 0...str.count)
+                pieceTable.insert(pos, text)
+                str = str.substring(0, pos) + text + str.substring(pos)
+            } else {
+                // delete
+                let pos = Int.random (in: 0..<str.count)
+                let length = min(
+                    str.count - pos,
+                    Int.random (in: 0...10)
+                )
+                pieceTable.delete(offset: pos, cnt: length)
+                str = str.substring(0, pos) + str.substring(pos + length)
+            }
+        }
+
+        XCTAssertEqual(pieceTable.getLines(), str)
+        testLineStarts(str, pieceTable)
+        testLinesContent(str, pieceTable)
+        assertTreeInvariants(pieceTable)
+    }
+    
 //
 //        test("random chunks 2", function () {
 //            this.timeout(500000)
@@ -1944,4 +2071,5 @@ class PieceTreeTextBufferTests: XCTestCase {
 //            assert.deepEqual(ret[0].range, new Range(2, 2, 2, 3))
 //        })
 //    })
+
 }
