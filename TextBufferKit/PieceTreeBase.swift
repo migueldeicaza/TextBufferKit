@@ -1375,7 +1375,8 @@ public class PieceTreeBase {
     
     func appendToNode(node: inout TreeNode, value: inout [UInt8]) {
         if adjustCarriageReturnFromNext(value: &value, node: node) {
-            value += [10]
+            // In Swift, we mutated this copy of value
+            // value += [10]
         }
 
         let hitCRLF = shouldCheckCRLF() && startWithLF(value) && endWithCR(node)
