@@ -1668,39 +1668,40 @@ class PieceTreeTextBufferTests: XCTestCase {
         assertTreeInvariants(pieceTable)
     }
 
-//
-//    suite("random is unsupervised", () => {
-//        test("splitting large change buffer", function () {
-//            let pieceTable = createTextBuffer([""], false)
-//            var str = ""
-//
-//            pieceTable.insert(0, "WUZ\nXVZY\n")
-//            str = str.substring(0, 0) + "WUZ\nXVZY\n" + str.substring(0)
-//            pieceTable.insert(8, "\r\r\nZXUWVW")
-//            str = str.substring(0, 8) + "\r\r\nZXUWVW" + str.substring(8)
-//            pieceTable.delete(10, 7)
-//            str = str.substring(0, 10) + str.substring(10 + 7)
-//            pieceTable.delete(10, 1)
-//            str = str.substring(0, 10) + str.substring(10 + 1)
-//            pieceTable.insert(4, "VX\r\r\nWZVZ")
-//            str = str.substring(0, 4) + "VX\r\r\nWZVZ" + str.substring(4)
-//            pieceTable.delete(11, 3)
-//            str = str.substring(0, 11) + str.substring(11 + 3)
-//            pieceTable.delete(12, 4)
-//            str = str.substring(0, 12) + str.substring(12 + 4)
-//            pieceTable.delete(8, 0)
-//            str = str.substring(0, 8) + str.substring(8 + 0)
-//            pieceTable.delete(10, 2)
-//            str = str.substring(0, 10) + str.substring(10 + 2)
-//            pieceTable.insert(0, "VZXXZYZX\r")
-//            str = str.substring(0, 0) + "VZXXZYZX\r" + str.substring(0)
-//
-//            XCTAssertEqual(pieceTable.getLines(), str)
-//
-//            testLineStarts(str, pieceTable)
-//            testLinesContent(str, pieceTable)
-//            assertTreeInvariants(pieceTable)
-//        })
+
+    func testSplittingLargeChangeBuffer ()
+    {
+        //  test("splitting large change buffer", function () {
+        let pieceTable = createTextBuffer([""], false)
+        var str = ""
+
+        pieceTable.insert(0, "WUZ\nXVZY\n")
+        str = str.substring(0, 0) + "WUZ\nXVZY\n" + str.substring(0)
+        pieceTable.insert(8, "\r\r\nZXUWVW")
+        str = str.substring(0, 8) + "\r\r\nZXUWVW" + str.substring(8)
+        pieceTable.delete(offset: 10, cnt: 7)
+        str = str.substring(0, 10) + str.substring(10 + 7)
+        pieceTable.delete(offset: 10, cnt: 1)
+        str = str.substring(0, 10) + str.substring(10 + 1)
+        pieceTable.insert(4, "VX\r\r\nWZVZ")
+        str = str.substring(0, 4) + "VX\r\r\nWZVZ" + str.substring(4)
+        pieceTable.delete(offset: 11, cnt: 3)
+        str = str.substring(0, 11) + str.substring(11 + 3)
+        pieceTable.delete(offset: 12, cnt: 4)
+        str = str.substring(0, 12) + str.substring(12 + 4)
+        pieceTable.delete(offset: 8, cnt: 0)
+        str = str.substring(0, 8) + str.substring(8 + 0)
+        pieceTable.delete(offset: 10, cnt: 2)
+        str = str.substring(0, 10) + str.substring(10 + 2)
+        pieceTable.insert(0, "VZXXZYZX\r")
+        str = str.substring(0, 0) + "VZXXZYZX\r" + str.substring(0)
+
+        XCTAssertEqual(pieceTable.getLines(), str)
+
+        testLineStarts(str, pieceTable)
+        testLinesContent(str, pieceTable)
+        assertTreeInvariants(pieceTable)
+    }
 
     func testRandomInsertDelete ()
     {
@@ -1779,42 +1780,41 @@ class PieceTreeTextBufferTests: XCTestCase {
         assertTreeInvariants(pieceTable)
     }
     
-//
-//        test("random chunks 2", function () {
-//            this.timeout(500000)
-//            let chunks: string[] = []
-//            chunks.push(randomStr(1000))
-//
-//            let pieceTable = createTextBuffer(chunks, false)
-//            let str = chunks.join("")
-//
-//            for (let i = 0 i < 50 i++) {
-//                if (Math.random() < 0.6) {
-//                    // insert
-//                    let text = randomStr(30)
-//                    let pos = randomInt(str.count + 1)
-//                    pieceTable.insert(pos, text)
-//                    str = str.substring(0, pos) + text + str.substring(pos)
-//                } else {
-//                    // delete
-//                    let pos = randomInt(str.count)
-//                    let length = Math.min(
-//                        str.count - pos,
-//                        Math.floor(Math.random() * 10)
-//                    )
-//                    pieceTable.delete(pos, length)
-//                    str = str.substring(0, pos) + str.substring(pos + length)
-//                }
-//                testLinesContent(str, pieceTable)
-//            }
-//
-//            XCTAssertEqual(pieceTable.getLines(), str)
-//            testLineStarts(str, pieceTable)
-//            testLinesContent(str, pieceTable)
-//            assertTreeInvariants(pieceTable)
-//        })
-//    })
 
+    func testRandomChunks22 ()
+    {
+        // test("random chunks 2", function () {
+
+        var chunks: [String] = []
+        chunks.append(randomStr(1000))
+
+        let pieceTable = createTextBuffer(chunks, false)
+        var str = chunks.joined(separator: "")
+
+        for i in 0..<50 {
+            if (Int.random(in: 0..<10) < 6) {
+                // insert
+                let text = randomStr(30)
+                let pos = Int.random (in:0...str.count)
+                pieceTable.insert(pos, text)
+                str = str.substring(0, pos) + text + str.substring(pos)
+            } else {
+                // delete
+                let pos = Int.random(in: 0..<str.count)
+                let length = min(
+                    str.count - pos, Int.random (in:0..<10))
+                pieceTable.delete(offset: pos, cnt: length)
+                str = str.substring(0, pos) + str.substring(pos + length)
+            }
+            testLinesContent(str, pieceTable)
+        }
+
+        XCTAssertEqual(pieceTable.getLines(), str)
+        testLineStarts(str, pieceTable)
+        testLinesContent(str, pieceTable)
+        assertTreeInvariants(pieceTable)
+    }
+    
     func testBufferApiEqual ()
     {
         // test("equal", () => {
@@ -1989,17 +1989,18 @@ class PieceTreeTextBufferTests: XCTestCase {
 //
 //    })
 //
-//    function getValueInSnapshot(snapshot: ITextSnapshot) {
-//        let ret = ""
-//        let tmp = snapshot.read()
-//
-//        while (tmp !== null) {
-//            ret += tmp
-//            tmp = snapshot.read()
-//        }
-//
-//        return ret
-//    }
+    func getValueInSnapshot(snapshot: inout PieceTreeSnapshot) : [UInt8] {
+        var ret : [UInt8] = ""
+        var tmp = snapshot.read()
+
+        while (tmp != nil) {
+            ret += tmp!
+            tmp = snapshot.read()
+        }
+
+        return ret
+    }
+    
 //    suite("snapshot", () => {
 //        test("bug #45564, piece tree pieces should be immutable", () => {
 //            const model = TextModel.createFromString("\n")
