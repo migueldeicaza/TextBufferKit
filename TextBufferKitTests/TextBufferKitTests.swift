@@ -63,6 +63,9 @@ class TextBufferKitTests: XCTestCase {
         XCTAssertEqual(pieceTree.getLineContent (1), toBytes ("aAbc"))
         XCTAssertEqual(pieceTree.getLineContent(2), toBytes ("def"))
     }
+    
+    // More:
+    // https://raw.githubusercontent.com/microsoft/vscode/master/src/vs/editor/test/common/model/pieceTreeTextBuffer/pieceTreeTextBuffer.test.ts
 
     func testPerformanceExample() {
         // This is an example of a performance test case.
