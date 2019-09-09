@@ -1989,8 +1989,8 @@ class PieceTreeTextBufferTests: XCTestCase {
 //
 //    })
 //
-    func getValueInSnapshot(snapshot: inout PieceTreeSnapshot) : [UInt8] {
-        var ret : [UInt8] = ""
+    func getValueInSnapshot(snapshot: inout PieceTreeSnapshot) -> [UInt8] {
+        var ret : [UInt8] = []
         var tmp = snapshot.read()
 
         while (tmp != nil) {
