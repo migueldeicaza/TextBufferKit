@@ -12,10 +12,12 @@ pool:
 steps:
 - task: Bash@3
   inputs:
-    script: swift build
+    script: |
+      swift build
   displayName: Build
 
 - task: Bash@3
   inputs:
-    script: swift test
+    script: |
+      swift test
   displayName: Test
