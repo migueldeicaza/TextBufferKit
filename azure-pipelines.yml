@@ -1,0 +1,21 @@
+# Xcode
+# Build, test, and archive an Xcode workspace on macOS.
+# Add steps that install certificates, test, sign, and distribute an app, save build artifacts, and more:
+# https://docs.microsoft.com/azure/devops/pipelines/languages/xcode
+
+trigger:
+- master
+
+pool:
+  vmImage: 'macos-latest'
+
+steps:
+- task: Bash@3
+  inputs:
+    script: swift build
+  displayName: Build
+
+- task: Bash@3
+  inputs:
+    script: swift test
+  displayName: Test
