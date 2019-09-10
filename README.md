@@ -1,4 +1,6 @@
-TextBufferKit - a port of the vscode-textbuffer code to Swift
+TextBufferKit - a port of the vscode-textbuffer code to Swift 5.1
+
+(This currently requires Xcode11 to build)
 
 Documented here:
 
