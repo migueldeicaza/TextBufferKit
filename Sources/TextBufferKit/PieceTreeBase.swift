@@ -34,22 +34,22 @@ struct LineStarts {
     /// Offsets for each line start
     public var lineStarts: [Int]
     /// Number of carriage returns found
-    public var cr : Int
+    public var cr: Int
     /// Number of line feeds found
-    public var lf : Int
+    public var lf: Int
     /// Number of carriage returns followed by line feeds found
-    public var crlf : Int
+    public var crlf: Int
     /// Whether this file contains simple ascii characters (tab, and chars 32 to 127) or not
-    public var isBasicAscii : Bool
+    public var isBasicAscii: Bool
 
     /**
      * Given a byte array containing the text buffer, create an array pointing to the
      * beginning of each line -- where lines are considered those immediately after a
      * \r\n or a \n
      */
-    public static func createLineStartsArray (_ data : [UInt8]) -> [Int]
+    public static func createLineStartsArray (_ data: [UInt8]) -> [Int]
     {
-        var result : [Int] = [0]
+        var result: [Int] = [0]
         
         var i = 0
         let len = data.count
@@ -75,9 +75,9 @@ struct LineStarts {
     /**
      * Creates a LineStarts structure from the given byte array
      */
-    public init (data : [UInt8])
+    public init (data: [UInt8])
     {
-        var result : [Int] = [0]
+        var result: [Int] = [0]
         var cr = 0
         var lf = 0
         var crlf = 0
@@ -123,9 +123,9 @@ struct PieceIndex {
     /// Piece index
     var node: TreeNode
     /// Remainder in current piece
-    var remainder : Int
+    var remainder: Int
     /// Node start offset in document
-    var nodeStartOffset : Int
+    var nodeStartOffset: Int
 }
 
 
@@ -160,29 +160,29 @@ struct CacheEntry {
 
 struct BufferCursor {
     /// Line number in current buffer
-    var line : Int
+    var line: Int
     /// Column number in current buffer
-    var column : Int
+    var column: Int
 }
 
 public struct StringBuffer {
-    var buffer : [UInt8]
-    var lineStarts : [Int]
+    var buffer: [UInt8]
+    var lineStarts: [Int]
 }
 
 public struct Piece {
-    var bufferIndex : Int
-    var start : BufferCursor
-    var end : BufferCursor
-    var length : Int
-    var lineFeedCount : Int
+    var bufferIndex: Int
+    var start: BufferCursor
+    var end: BufferCursor
+    var length: Int
+    var lineFeedCount: Int
 }
 
 public struct PieceTreeSnapshot {
-    var pieces : [Piece]
-    var index : Int
-    var tree : PieceTreeBase
-    var bom : [UInt8]
+    var pieces: [Piece]
+    var index: Int
+    var tree: PieceTreeBase
+    var bom: [UInt8]
     
     public init (tree: PieceTreeBase, bom: [UInt8])
     {
@@ -294,7 +294,7 @@ let AverageBufferSize = 64*1024
 public class PieceTreeBase {
     var root: TreeNode = TreeNode.SENTINEL
     var buffers: [StringBuffer] = [StringBuffer (buffer: [], lineStarts: [])]
-    public private(set) var lineCount : Int = 1
+    public private(set) var lineCount: Int = 1
     public private(set) var length: Int = 0
     var _eol: [UInt8] = [10]
     public var eol: [UInt8] {
@@ -315,12 +315,12 @@ public class PieceTreeBase {
     /// Initializes the PieceTreeBase
     /// - Parameter eol: must be a String either "\n" or "\r\n"
     ///
-    public init (chunks: inout [StringBuffer], eol: [UInt8], eolNormalized : Bool)
+    public init (chunks: inout [StringBuffer], eol: [UInt8], eolNormalized: Bool)
     {
         create(chunks: &chunks, eol: eol, eolNormalized: eolNormalized)
     }
 
-    func create (chunks: inout [StringBuffer], eol: [UInt8], eolNormalized : Bool)
+    func create (chunks: inout [StringBuffer], eol: [UInt8], eolNormalized: Bool)
     {
         buffers = [StringBuffer(buffer: [], lineStarts: [0])]
         lineCount = 1
@@ -329,7 +329,7 @@ public class PieceTreeBase {
         eolLength = eol.count
         self.eolNormalized = eolNormalized
         
-        var lastNode : TreeNode? = nil
+        var lastNode: TreeNode? = nil
         var i = 0
         let top = chunks.count
         while i < top {
@@ -356,7 +356,7 @@ public class PieceTreeBase {
     // Replaces \r\n, \r and \n with the value of eol
     func replaceNewLines (_ val: [UInt8]) -> [UInt8]
     {
-        var result : [UInt8] = []
+        var result: [UInt8] = []
         let len = val.count
         var i = 0
         while i < len {
@@ -384,7 +384,7 @@ public class PieceTreeBase {
         let min = Int (Float (averageBufferSize) - floor(Float (averageBufferSize / 3)))
         let max = min * 2
 
-        var tempChunk : [UInt8] = []
+        var tempChunk: [UInt8] = []
         var tempChunkLen = 0
         var chunks: [StringBuffer] = []
 
@@ -572,9 +572,9 @@ public class PieceTreeBase {
     /// where lines are those with \r\n, \r or \n
     public static func splitBufferInLines (_ contents: [UInt8]) -> [[UInt8]]
     {
-        var result : [[UInt8]] = []
+        var result: [[UInt8]] = []
         var i = 0
-        var line : [UInt8] = []
+        var line: [UInt8] = []
         
         let top = contents.count
         while i < top {
@@ -1221,7 +1221,7 @@ public class PieceTreeBase {
         var lineNumber = _lineNumber
         var x = root
 
-        var ret : [UInt8] = [];
+        var ret: [UInt8] = [];
 
         if let cache = searchCache.get2(lineNumber: lineNumber) {
             x = cache.node
@@ -1763,7 +1763,7 @@ public class PieceTreeBase {
     }
     
     func getContentOfSubTree(node: TreeNode) -> [UInt8] {
-        var str : [UInt8] = []
+        var str: [UInt8] = []
 
         iterate(node: node, callback: { node in
             str += getNodeContent(node)

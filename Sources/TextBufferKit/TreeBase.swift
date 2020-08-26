@@ -32,7 +32,7 @@ enum NodeColor {
     case red
 }
 
-public class TreeNode : CustomDebugStringConvertible {
+public class TreeNode: CustomDebugStringConvertible {
     var parent: TreeNode?
     var left: TreeNode?
     var right: TreeNode?
@@ -40,8 +40,8 @@ public class TreeNode : CustomDebugStringConvertible {
 
     // Piece
     var piece: Piece
-    var size_left : Int // size of the left subtree (not inorder)
-    var lf_left : Int // line feeds cnt in the left subtree (not in order)
+    var size_left: Int // size of the left subtree (not inorder)
+    var lf_left: Int // line feeds cnt in the left subtree (not in order)
 
     init (_ piece: Piece, _ color: NodeColor) {
         self.piece = piece

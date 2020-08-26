@@ -27,7 +27,7 @@
 
 import Foundation
 
-let bomArray : [UInt8] = [0xeb, 0xbb, 0xbf]
+let bomArray: [UInt8] = [0xeb, 0xbb, 0xbf]
 
 func startsWithUTF8BOM(str: [UInt8]) -> Bool
 {
@@ -48,14 +48,14 @@ public enum DefaultEndOfLine {
 }
 
 public class PieceTreeTextBufferFactory {
-    var chunks : [StringBuffer]
+    var chunks: [StringBuffer]
     var bom: [UInt8]
     var cr, lf, crlf: Int
     var normalizeEol: Bool
     var containsRtl: Bool = false
     var isBasicAscii: Bool = false
     
-    init(chunks : [StringBuffer], bom: [UInt8], cr : Int, lf: Int, crlf: Int, normalizeEol:Bool, containsRtl: Bool? = nil, isBasicAscii : Bool? = nil)
+    init(chunks: [StringBuffer], bom: [UInt8], cr: Int, lf: Int, crlf: Int, normalizeEol:Bool, containsRtl: Bool? = nil, isBasicAscii: Bool? = nil)
     {
         self.chunks = chunks
         self.bom = bom

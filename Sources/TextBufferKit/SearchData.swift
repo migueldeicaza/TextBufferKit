@@ -33,7 +33,7 @@ public struct SearchData {
     // The word separator classifier.
     // public var wordSeparators: WordCharacterClassifier
     /// The simple string to search for (if possible).
-    public var simpleSearch : String?
+    public var simpleSearch: String?
 }
 
 

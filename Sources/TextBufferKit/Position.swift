@@ -27,7 +27,7 @@
 
 import Foundation
 
-public struct Position : Equatable {
+public struct Position: Equatable {
     var line: Int
     var column: Int
     
@@ -36,7 +36,7 @@ public struct Position : Equatable {
         return Self.isBeforeOrEqual(self, other);
     }
     
-    public static func isBeforeOrEqual (_ lhs : Position, _ rhs: Position) -> Bool
+    public static func isBeforeOrEqual (_ lhs: Position, _ rhs: Position) -> Bool
     {
         if lhs.line < rhs.line {
             return true

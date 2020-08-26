@@ -20,7 +20,7 @@ public func toBytes (_ str: String) -> [UInt8]
 
 public func toBytes (_ strs: [String]) -> [[UInt8]]
 {
-    var result : [[UInt8]] = []
+    var result: [[UInt8]] = []
     
     for str in strs {
         result.append (toBytes (str))

@@ -59,7 +59,7 @@ public struct Range {
     /// Line number on which the range ends.
     public var endLineNumber: Int
     /// Column on which the range ends in line `endLineNumber`.
-    public var endColumn : Int
+    public var endColumn: Int
     
     public func isEmpty() ->Bool
     {

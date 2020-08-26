@@ -70,7 +70,7 @@ class PieceTreeTextBufferTests: XCTestCase {
     func randomStr(_ _len: Int? = nil) -> String
     {
         let len = _len != nil ? _len! : 10
-        var result : String = ""
+        var result: String = ""
         
         for _ in 0..<len {
             result.append(randomChar ())
@@ -116,7 +116,7 @@ class PieceTreeTextBufferTests: XCTestCase {
     func splitStringNewlines (_ str: String) -> [String]
     {
         let lines = PieceTreeBase.splitBufferInLines (toBytes (str))
-        var result : [String] = []
+        var result: [String] = []
         for x in lines {
             result.append (toStr (x))
         }
@@ -1447,7 +1447,7 @@ class PieceTreeTextBufferTests: XCTestCase {
     func testCentralized_random4 ()
     {
         // test("random bug 4", () => {
-        var str : bstr = [10,10,10,10]
+        var str: bstr = [10,10,10,10]
         let pieceTable = createTextBuffer(["\n\n\n\n"], false)
 
         pieceTable.delete(offset: 3, cnt: 1)
@@ -1990,7 +1990,7 @@ class PieceTreeTextBufferTests: XCTestCase {
 //    })
 //
     func getValueInSnapshot(snapshot: inout PieceTreeSnapshot) -> [UInt8] {
-        var ret : [UInt8] = []
+        var ret: [UInt8] = []
         var tmp = snapshot.read()
 
         while (tmp != nil) {

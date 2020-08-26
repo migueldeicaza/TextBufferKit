@@ -41,14 +41,14 @@ public struct ValidatedEditOperation {
 /// An identifier for a single edit operation.
 public struct SingleEditOperationIdentifier {
     /// Identifier major
-    public var major : Int
+    public var major: Int
     /// Identifier minor
-    public var minor : Int
+    public var minor: Int
 }
 
 public class IdentifiedSingleEditOperation {
     /// An identifier associated with this single edit operation.
-    public var identifier : SingleEditOperationIdentifier?
+    public var identifier: SingleEditOperationIdentifier?
     /// The range to replace. This can be empty to emulate a simple insert.
     public var range: Range
     /// The text to replace with. This can be null to emulate a simple delete.
@@ -60,7 +60,7 @@ public class IdentifiedSingleEditOperation {
     /// that can be removed on next model edit operation if `config.trimAutoWhitespace` is true.
     public var isAutoWhitespaceEdit: Bool?
     /// This indicates that this operation is in a set of operations that are tracked and should not be "simplified".
-    var isTracked : Bool
+    var isTracked: Bool
     
     internal init(identifier: SingleEditOperationIdentifier?, range: Range, text: [UInt8]?, forceMoveMarkers: Bool, isAutoWhitespaceEdit: Bool?, isTracked: Bool) {
         self.identifier = identifier
@@ -72,7 +72,7 @@ public class IdentifiedSingleEditOperation {
     }
 }
 
-public class ReverseSingleEditOperation : IdentifiedSingleEditOperation {
+public class ReverseSingleEditOperation: IdentifiedSingleEditOperation {
     var sortIndex: Int
     internal init(sortIndex: Int, identifier: SingleEditOperationIdentifier?, range: Range, text: [UInt8]?, forceMoveMarkers: Bool, isAutoWhitespaceEdit: Bool?, isTracked: Bool) {
         self.sortIndex = sortIndex
@@ -108,7 +108,7 @@ public class PieceTreeTextBuffer {
     public private(set) var bom: [UInt8]
     public private(set) var mightContainRTL: Bool
     public private(set) var mightContainNonBasicASCII: Bool
-    public var eol : [UInt8] {
+    public var eol: [UInt8] {
         get { pieceTree.eol }
         set {
             if newValue == [10] || newValue == [10, 13] {
@@ -139,7 +139,7 @@ public class PieceTreeTextBuffer {
        
     public func createSnapshot (preserveBOM: Bool) ->  PieceTreeSnapshot
     {
-        return pieceTree.createSnapshot(bom: preserveBOM ? bom : [])
+        return pieceTree.createSnapshot(bom: preserveBOM ? bom: [])
     }
 
     public func getOffsetAt(lineNumber: Int, column: Int) ->  Int
@@ -286,7 +286,7 @@ public class PieceTreeTextBuffer {
         return true
     }
     
-    public enum UsageError : Error {
+    public enum UsageError: Error {
         case overlappingRanges
     }
     
@@ -540,7 +540,7 @@ public class PieceTreeTextBuffer {
             let insertingLinesCnt = (op.lines != nil ? op.lines!.count - 1 : 0)
             let editingLinesCnt = min(deletingLinesCnt, insertingLinesCnt)
 
-            let text : [UInt8] = (op.lines != nil ? Array (op.lines!.joined(separator: eol)) : [])
+            let text: [UInt8] = (op.lines != nil ? Array (op.lines!.joined(separator: eol)) : [])
 
             if text.count > 0 {
                 // replacement
