@@ -28,8 +28,8 @@
 import Foundation
 
 public struct Position: Equatable {
-    var line: Int
-    var column: Int
+    public var line: Int
+    public var column: Int
     
     public func isBeforeOrEqual (_ other: Position) -> Bool
     {

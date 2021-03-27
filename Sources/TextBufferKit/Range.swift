@@ -52,6 +52,12 @@ public struct Range {
         return Range(startLineNumber: startLine, startColumn: startColumn, endLineNumber: endLine, endColumn: endColumn)
     }
     
+    public static func from (start: Int, end: Int, on: PieceTreeTextBuffer) -> Range
+    {
+        let sp = on.getPositionAt(offset: start)
+        let ep = on.getPositionAt(offset: end)
+        return Range (startLineNumber: sp.line, startColumn: sp.column, endLineNumber: ep.line, endColumn: ep.column)
+    }
     /// Line number on which the range starts (starts at 1).
     public var startLineNumber: Int
     /// Column on which the range starts in line `startLineNumber` (starts at 1).

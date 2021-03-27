@@ -146,7 +146,21 @@ public class PieceTreeTextBuffer {
     {
         return pieceTree.getOffsetAt(lineNumber, column)
     }
+    
+    public func delete (offset: Int, count: Int) {
+        pieceTree.delete(offset: offset, cnt: count)
+    }
 
+    public var lineCount: Int {
+        get {
+            return pieceTree.lineCount
+        }
+    }
+    
+    public func insert (offset: Int, value: [UInt8]) {
+        pieceTree.insert(offset, value)
+    }
+    
     public func getPositionAt(offset: Int) ->  Position
     {
         return pieceTree.getPositionAt(offset)
@@ -167,6 +181,11 @@ public class PieceTreeTextBuffer {
         }
         let lineEnding = _getEndOfLine(eol: eol)
         return pieceTree.getValueInRange(range: range, eol: lineEnding)
+    }
+    
+    public func getValueAt (index: Int) -> UInt8? {
+        let b = getValueInRange(range: Range.from(start: index, end: index+1, on: self))
+        return b.first
     }
 
     public func getValueLengthInRange(range: Range, eol: EndOfLinePreference = EndOfLinePreference.TextDefined) ->  Int
@@ -192,18 +211,33 @@ public class PieceTreeTextBuffer {
         return pieceTree.lineCount
     }
 
+    // Returns an array of lines, each line containing an array of bytes for the line, usually used as an UTF* buffer
     public func getLinesContent() -> [[UInt8]] {
         return pieceTree.getLinesContent()
     }
 
+    /// Returns the contents of the buffer as a byte array
+    public func getLinesRawContent() -> [UInt8] {
+        return pieceTree.getLinesRawContent()
+    }
+    
+    /// Returns the contents of the specified line as a byte array
+    /// - Parameter lineNumber: the line to look up, starting at line 1
     public func getLineContent(_ lineNumber: Int) ->  [UInt8] {
         return pieceTree.getLineContent(lineNumber)
     }
 
+    /// Returns the content of the byte at the line `lineNumber` at offset `index`
+    /// - Parameter lineNumber: the line to look up, starting at line 1
+    /// - Parameter index: 0-based index to the element to retrieve
+    /// - Returns: The byte at the specified position
     public func getLineCharCode(lineNumber: Int, index: Int) ->  UInt8 {
         return pieceTree.getLineCharCode(lineNumber: lineNumber, index: index)
     }
 
+    /// Returns the number of bytes in the line at `lineNumber`
+    /// - Parameter lineNumber: the line to look up, starting at line 1
+    /// - Returns: the number of bytes in the line
     public func getLineLength(lineNumber: Int) ->  Int {
         return pieceTree.getLineLength(lineNumber: lineNumber)
     }
