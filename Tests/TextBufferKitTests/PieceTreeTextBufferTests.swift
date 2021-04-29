@@ -153,8 +153,7 @@ class PieceTreeTextBufferTests: XCTestCase {
     func testLinesContent(_ str: bstr, _ pieceTable: PieceTreeBase)
     {
         XCTAssert (str == pieceTable.getLinesRawContent ())
-        return
-        
+
         //
         // The code below is challenging, as my code to split lines is not identical to the metrics used
         // internally on the number of lines
@@ -1011,7 +1010,7 @@ class PieceTreeTextBufferTests: XCTestCase {
         pieceTable.delete(offset: 0, cnt: 4)
         str = str.substring(0, 0) + str.substring(0 + 4)
 
-        pieceTable.getValueInRange(range: Range(startLineNumber: 1, startColumn: 1, endLineNumber: 1, endColumn: 1))
+        _ = pieceTable.getValueInRange(range: Range(startLineNumber: 1, startColumn: 1, endLineNumber: 1, endColumn: 1))
         assertTreeInvariants(pieceTable)
     }
     
@@ -1791,7 +1790,7 @@ class PieceTreeTextBufferTests: XCTestCase {
         let pieceTable = createTextBuffer(chunks, false)
         var str = chunks.joined(separator: "")
 
-        for i in 0..<50 {
+        for _ in 0..<50 {
             if (Int.random(in: 0..<10) < 6) {
                 // insert
                 let text = randomStr(30)
