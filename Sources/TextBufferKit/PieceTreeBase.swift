@@ -1136,7 +1136,7 @@ public class PieceTreeBase {
     
     func createNewPieces(_ _text: [UInt8]) -> [Piece]
     {
-        var text = _text[0..<_text.count]
+        var text = Array(_text[0..<_text.count])
         
         if text.count > AverageBufferSize {
             // the content is large, operations like subString, charCode becomes slow
@@ -1150,10 +1150,10 @@ public class PieceTreeBase {
                 if lastChar == 13 || (lastChar >= 0xD800 && lastChar <= 0xDBFF) {
                     // last character is \r or a high surrogate => keep it back
                     splitText = Array (text [0..<(AverageBufferSize - 1)])
-                    text = text [(AverageBufferSize - 1)...]
+                    text = Array(text [(AverageBufferSize - 1)...])
                 } else {
                     splitText = Array (text [0..<AverageBufferSize])
-                    text = text[AverageBufferSize...]
+                    text = Array(text[AverageBufferSize...])
                 }
 
                 let lineStarts = LineStarts.createLineStartsArray(Array (splitText))
