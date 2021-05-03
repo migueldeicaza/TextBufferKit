@@ -289,13 +289,21 @@ class PieceTreeSearchCache {
     }
 }
 
-let AverageBufferSize = 64*1024
-
 public class PieceTreeBase {
     var root: TreeNode = TreeNode.SENTINEL
     var buffers: [StringBuffer] = [StringBuffer (buffer: [], lineStarts: [])]
     public private(set) var lineCount: Int = 1
     public private(set) var length: Int = 0
+    
+    /// This configuration variable can be used to control how small or large data is chunked in, the default is 64k
+    public var averageBufferSize: Int = 64*1024 {
+        didSet {
+            if averageBufferSize < 1 {
+                averageBufferSize = 64*1024
+            }
+        }
+    }
+    
     var _eol: [UInt8] = [10]
     public var eol: [UInt8] {
         get {
@@ -380,7 +388,7 @@ public class PieceTreeBase {
     
     func normalizeEol ()
     {
-        let averageBufferSize = AverageBufferSize
+        let averageBufferSize = self.averageBufferSize
         let min = Int (Float (averageBufferSize) - floor(Float (averageBufferSize / 3)))
         let max = min * 2
 
@@ -839,7 +847,7 @@ public class PieceTreeBase {
                 piece.end.line == lastChangeBufferPos.line &&
                 piece.end.column == lastChangeBufferPos.column &&
                 (nodeStartOffset + piece.length == offset) &&
-                value.count < AverageBufferSize
+                value.count < averageBufferSize
             {
                 // changed buffer
                 appendToNode(node: &node, value: &value)
@@ -1136,24 +1144,25 @@ public class PieceTreeBase {
     
     func createNewPieces(_ _text: [UInt8]) -> [Piece]
     {
-        var text = Array(_text[0..<_text.count])
+        var text = _text[0..<_text.count]
         
-        if text.count > AverageBufferSize {
+        if text.count > averageBufferSize {
             // the content is large, operations like subString, charCode becomes slow
             // so here we split it into smaller chunks, just like what we did for CR/LF normalization
             var newPieces: [Piece] = []
-            while text.count > AverageBufferSize {
-                let lastChar = Int (text [AverageBufferSize - 1])
+            while text.count > averageBufferSize {
+                let start = text.startIndex
+                let lastChar = Int (text [start + averageBufferSize - 1])
                 var splitText: [UInt8]
                 
                 // TODO: This code has some half-cooked code that does Unicode here
                 if lastChar == 13 || (lastChar >= 0xD800 && lastChar <= 0xDBFF) {
                     // last character is \r or a high surrogate => keep it back
-                    splitText = Array (text [0..<(AverageBufferSize - 1)])
-                    text = Array(text [(AverageBufferSize - 1)...])
+                    splitText = Array (text [start..<start+(averageBufferSize - 1)])
+                    text = text [(start+averageBufferSize - 1)...]
                 } else {
-                    splitText = Array (text [0..<AverageBufferSize])
-                    text = Array(text[AverageBufferSize...])
+                    splitText = Array (text [start..<start+averageBufferSize])
+                    text = text[(start+averageBufferSize)...]
                 }
 
                 let lineStarts = LineStarts.createLineStartsArray(Array (splitText))

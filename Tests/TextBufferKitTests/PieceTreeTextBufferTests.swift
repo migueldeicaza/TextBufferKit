@@ -62,7 +62,8 @@ extension bstr {
 class PieceTreeTextBufferTests: XCTestCase {
 
     let alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ\r\n"
-
+    let bufferSizes = [16, 128, 1024, 64*1024, 128*1024]
+    
     func randomChar() -> Character {
         return Array (alphabet)[Int.random (in: 0..<alphabet.count)]
     }
@@ -239,14 +240,19 @@ class PieceTreeTextBufferTests: XCTestCase {
 //        }
     }
 
-    func createTextBuffer(_ val: [String], _ normalizeEOL: Bool = true) -> PieceTreeBase
+    func createTextBuffer(_ val: [String], _ normalizeEOL: Bool = true, size: Int? = nil) -> PieceTreeBase
     {
         let bufferBuilder = PieceTreeTextBufferBuilder()
         for chunk in val {
             bufferBuilder.acceptChunk(chunk)
         }
         let factory = bufferBuilder.finish(normalizeEol: normalizeEOL)
-        return factory.create(.LF).getPieceTree()
+        let pieceTree = factory.create(.LF).getPieceTree()
+        
+        if let bufferSize = size {
+            pieceTree.averageBufferSize = bufferSize
+        }
+        return pieceTree
     }
     
 
@@ -306,33 +312,37 @@ class PieceTreeTextBufferTests: XCTestCase {
 
     func testInserts ()
     {
-        let pt = createTextBuffer([""])
+        for size in bufferSizes {
+            let pt = createTextBuffer([""], size: size)
 
-        pt.insert(0, "AAA")
-        XCTAssertEqual(pt.getLines(), "AAA")
-        pt.insert(0, "BBB")
-        XCTAssertEqual(pt.getLines(), "BBBAAA")
-        pt.insert(6, "CCC")
-        XCTAssertEqual(pt.getLines(), "BBBAAACCC")
-        pt.insert(5, "DDD")
-        XCTAssertEqual(pt.getLines(), "BBBAADDDACCC")
-        assertTreeInvariants(pt)
+            pt.insert(0, "AAA")
+            XCTAssertEqual(pt.getLines(), "AAA")
+            pt.insert(0, "BBB")
+            XCTAssertEqual(pt.getLines(), "BBBAAA")
+            pt.insert(6, "CCC")
+            XCTAssertEqual(pt.getLines(), "BBBAAACCC")
+            pt.insert(5, "DDD")
+            XCTAssertEqual(pt.getLines(), "BBBAADDDACCC")
+            assertTreeInvariants(pt)
+        }
     }
     
     func testDeletes ()
     {
-        let pt = createTextBuffer(["012345678"])
-        pt.delete(offset: 8, cnt: 1)
-        XCTAssertEqual(pt.getLines(), "01234567")
-        pt.delete(offset: 0, cnt: 1)
-        XCTAssertEqual(pt.getLines(), "1234567")
-        pt.delete(offset: 5, cnt: 1)
-        XCTAssertEqual(pt.getLines(), "123457")
-        pt.delete(offset: 5, cnt: 1)
-        XCTAssertEqual(pt.getLines(), "12345")
-        pt.delete(offset: 0, cnt: 5)
-        XCTAssertEqual(pt.getLines(), "")
-        assertTreeInvariants(pt)
+        for size in bufferSizes {
+            let pt = createTextBuffer(["012345678"], size: size)
+            pt.delete(offset: 8, cnt: 1)
+            XCTAssertEqual(pt.getLines(), "01234567")
+            pt.delete(offset: 0, cnt: 1)
+            XCTAssertEqual(pt.getLines(), "1234567")
+            pt.delete(offset: 5, cnt: 1)
+            XCTAssertEqual(pt.getLines(), "123457")
+            pt.delete(offset: 5, cnt: 1)
+            XCTAssertEqual(pt.getLines(), "12345")
+            pt.delete(offset: 0, cnt: 5)
+            XCTAssertEqual(pt.getLines(), "")
+            assertTreeInvariants(pt)
+        }
     }
     
     func testBasicInsertDelete ()
@@ -359,16 +369,18 @@ class PieceTreeTextBufferTests: XCTestCase {
 
     func testRandom1 ()
     {
-        let pieceTable = createTextBuffer([""])
-        pieceTable.insert(0, "ceLPHmFzvCtFeHkCBej ")
-        XCTAssertEqual(pieceTable.getLines(), "ceLPHmFzvCtFeHkCBej ")
-        pieceTable.insert(8, "gDCEfNYiBUNkSwtvB K ")
-        XCTAssertEqual(pieceTable.getLines(), "ceLPHmFzgDCEfNYiBUNkSwtvB K vCtFeHkCBej ")
-        pieceTable.insert(38, "cyNcHxjNPPoehBJldLS ")
-        XCTAssertEqual(pieceTable.getLines(), "ceLPHmFzgDCEfNYiBUNkSwtvB K vCtFeHkCBecyNcHxjNPPoehBJldLS j ")
-        pieceTable.insert(59, "ejMx\nOTgWlbpeDExjOk ")
-        XCTAssertEqual(pieceTable.getLines(), "ceLPHmFzgDCEfNYiBUNkSwtvB K vCtFeHkCBecyNcHxjNPPoehBJldLS jejMx\nOTgWlbpeDExjOk  ")
-        assertTreeInvariants(pieceTable)
+        for size in bufferSizes {
+            let pieceTable = createTextBuffer([""], size: size)
+            pieceTable.insert(0, "ceLPHmFzvCtFeHkCBej ")
+            XCTAssertEqual(pieceTable.getLines(), "ceLPHmFzvCtFeHkCBej ")
+            pieceTable.insert(8, "gDCEfNYiBUNkSwtvB K ")
+            XCTAssertEqual(pieceTable.getLines(), "ceLPHmFzgDCEfNYiBUNkSwtvB K vCtFeHkCBej ")
+            pieceTable.insert(38, "cyNcHxjNPPoehBJldLS ")
+            XCTAssertEqual(pieceTable.getLines(), "ceLPHmFzgDCEfNYiBUNkSwtvB K vCtFeHkCBecyNcHxjNPPoehBJldLS j ")
+            pieceTable.insert(59, "ejMx\nOTgWlbpeDExjOk ")
+            XCTAssertEqual(pieceTable.getLines(), "ceLPHmFzgDCEfNYiBUNkSwtvB K vCtFeHkCBecyNcHxjNPPoehBJldLS jejMx\nOTgWlbpeDExjOk  ")
+            assertTreeInvariants(pieceTable)
+        }
     }
 
     func testRandom2 ()
@@ -1881,6 +1893,18 @@ class PieceTreeTextBufferTests: XCTestCase {
         XCTAssertEqual(pieceTable.getLineCharCode(lineNumber: 2, index: 4), UInt8 (ascii: "2"))
     }
 
+    func testLargeBuffer ()
+    {
+        for size in bufferSizes {
+            let v: String = "abc123"
+            var k: String = ""
+            for x in 0..<64*1024 {
+                k += v
+            }
+            let pieceTable = createTextBuffer([k], size: size)
+            pieceTable.insert(0, k)
+        }
+    }
 //
 //    suite("search offset cache", () => {
 //        test("render white space exception", () => {
