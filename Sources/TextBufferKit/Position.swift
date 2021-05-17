@@ -31,6 +31,11 @@ public struct Position: Equatable {
     public var line: Int
     public var column: Int
     
+    public init (line: Int, column: Int) {
+        self.line = line
+        self.column = column
+    }
+    
     public func isBeforeOrEqual (_ other: Position) -> Bool
     {
         return Self.isBeforeOrEqual(self, other);
